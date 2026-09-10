@@ -502,14 +502,16 @@ function hasActiveColFilter() {
                   return (
                     <th key={c.key} style={{ width: colWidths[c.key], textAlign: c.center ? 'center' : 'left' }} onClick={() => { if (!dragRef.current) onSort(c.key); }}>
                       <span className="th-label">{c.label}</span>
-                      <span className="th-sort">{sortKey === c.key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
-                      <button
-                        className={`filter-funnel ${colActive ? 'active' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleFilterColumn(c.key); }}
-                        title="Filtrer"
-                      >
-                        <Filter size={11} />
-                      </button>
+                      <span className="th-meta">
+                        <span className="th-sort">{sortKey === c.key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+                        <button
+                          className={`filter-funnel ${colActive ? 'active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleFilterColumn(c.key); }}
+                          title="Filtrer"
+                        >
+                          <Filter size={11} />
+                        </button>
+                      </span>
                       <span
                         className="col-resize-handle"
                         onMouseDown={(e) => startResize(e, c.key)}
