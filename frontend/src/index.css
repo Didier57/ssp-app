@@ -588,6 +588,13 @@ table.table th .th-sort {
 }
 .clients-page table.table th .filter-funnel { position: static; flex-shrink: 0; }
 
+/* ==== Table Report : en-têtes figées + défilement interne ==== */
+.report-wrap {
+  max-height: 70vh;
+  overflow: auto;
+}
+.report-wrap table.table thead th { position: sticky; top: 0; z-index: 6; }
+
 .btn-files {
   display: inline-flex;
   align-items: center;
