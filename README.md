@@ -9,7 +9,7 @@ Application web pour la gestion des clients et des licences **Openscape Business
 - **CRUD complet** : ajouter / modifier / supprimer des clients (admin uniquement)
 - **Dashboard** : statistiques, graphiques par gamme de produit, expirations à venir
 - **Alertes visuelles** : expiration de licence < 90 jours (orange), expirée (rouge)
-- **Exports** : Excel, PDF, CSV des données filtrées
+- **Exports** : Excel, des données filtrées
 - **Gestion des utilisateurs** : création, modification (rôle, mot de passe), email, suppression (admin)
 - **Menu horizontal en haut** : Dashboard, Clients, Utilisateurs (admin)
 
