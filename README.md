@@ -1,6 +1,6 @@
 # Application SSP Openscape Business
 
-Application web pour la gestion des clients et des licences **Openscape Business** (réf. `Table SSPOSBIZ.xlsx`).
+Application web pour la gestion des clients et des licences **Openscape Business**.
 
 ## Fonctionnalités
 
