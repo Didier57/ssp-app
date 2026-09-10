@@ -2,7 +2,7 @@ const XLSX = require('xlsx');
 const db = require('./db');
 
 // Tables exportées dans le classeur Excel (un onglet par table).
-// - customers, users, last_ssp, par_mois : données métier / comptes
+// - customers, users, last_ssp, par_mois, licenses (Report) : données métier / comptes
 // - settings : configuration (SMTP, notifications, dates)
 // - reminder_sent : évite de renvoyer les mêmes rappels après restauration
 // - customer_files : seulement les métadonnées (le contenu binaire BLOB ne peut
@@ -13,6 +13,7 @@ const TABLES = [
   { name: 'users', exclude: [] },
   { name: 'last_ssp', exclude: [] },
   { name: 'par_mois', exclude: [] },
+  { name: 'licenses', exclude: [] },
   { name: 'settings', exclude: [] },
   { name: 'reminder_sent', exclude: [] },
   { name: 'customer_files', exclude: ['content'] }
@@ -67,16 +68,18 @@ function importRows(table, rows) {
 function importBackup(buffer) {
   const wb = XLSX.read(buffer, { type: 'buffer' });
   const before = summary();
+  // Ne restaure que les tables présentes dans le fichier : une ancienne sauvegarde
+  // sans onglet (ex. "licenses" avant l'inclusion du Report) ne doit pas vider la table.
+  const restore = TABLES.filter((t) => wb.Sheets[t.name]);
   const originalAdmins = db
     .prepare(`SELECT id, username, password_hash, role, email, created_at FROM users WHERE role = 'admin'`)
     .all();
 
   const tx = db.transaction(() => {
-    for (const t of TABLES) {
+    for (const t of restore) {
       db.prepare(`DELETE FROM ${t.name}`).run();
     }
-    for (const t of TABLES) {
-      if (!wb.Sheets[t.name]) continue;
+    for (const t of restore) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[t.name], { defval: '', raw: false });
       importRows(t.name, rows);
     }

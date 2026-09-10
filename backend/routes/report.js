@@ -176,4 +176,17 @@ router.delete('/rows/:id', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /api/report/rows — supprime TOUTES les données Report (admin uniquement)
+router.delete('/rows', requireAdmin, (req, res) => {
+  const { changes } = db.prepare('DELETE FROM licenses').run();
+  logAudit({
+    user: req.user,
+    action: 'Suppression de toutes les licences',
+    category: 'license',
+    target: 'Report (toutes les LAC)',
+    detail: `${changes} ligne(s) supprimée(s)`
+  });
+  res.json({ ok: true, deleted: changes });
+});
+
 module.exports = router;

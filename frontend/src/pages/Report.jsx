@@ -44,6 +44,8 @@ export default function Report() {
   const [lastImport, setLastImport] = useState(null);
   const [confirmRow, setConfirmRow] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const [sortKey, setSortKey] = useState('create_date');
   const [sortDir, setSortDir] = useState('desc'); // dates les plus proches en haut
@@ -277,6 +279,11 @@ export default function Report() {
             {importing ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}
             Importer le fichier
           </button>
+          {isAdmin && (
+            <button className="btn btn-danger" onClick={() => setConfirmClear(true)} disabled={importing || clearing} title="Supprimer toutes les données du Report">
+              <Trash2 size={15} /> Vider le report
+            </button>
+          )}
         </div>
       </div>
 
@@ -340,7 +347,24 @@ export default function Report() {
                     const cellText = c.key === 'create_date' ? formatDate(r[c.key])
                       : c.key === 'total_quantity' ? (Number(r[c.key]) || 0).toLocaleString('fr-FR')
                       : r[c.key] ?? '—';
-                    return (
+async function handleClearAll() {
+    setClearing(true);
+    setError('');
+    try {
+      const r = await api.del('/report/rows');
+      showToast(`${r.deleted} ligne(s) supprimée(s) du Report`);
+      setConfirmClear(false);
+      await loadLacs('');
+      setRows([]);
+    } catch (e) {
+      setError(e.message);
+      setConfirmClear(false);
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  return (
                       <td key={c.key} style={c.center ? { textAlign: 'center' } : undefined} title={cellText}>
                         {cellText}
                       </td>
@@ -382,6 +406,17 @@ export default function Report() {
           onCancel={() => !deleting && setConfirmRow(null)}
           onConfirm={handleDeleteRow}
           loading={deleting}
+        />
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Supprimer toutes les données du Report ?"
+          message="Cette action supprime définitivement toutes les lignes de licences de toutes les LAC. Le fichier source devra être réimporté si besoin."
+          confirmLabel="Tout supprimer"
+          onCancel={() => !clearing && setConfirmClear(false)}
+          onConfirm={handleClearAll}
+          loading={clearing}
         />
       )}
     </div>
