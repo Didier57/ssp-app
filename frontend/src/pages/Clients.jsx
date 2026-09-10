@@ -381,19 +381,6 @@ function hasActiveColFilter() {
     }
   }
 
-  async function toggleContract(r, value) {
-    const prev = allRows;
-    const nextVal = Number(value);
-    setAllRows((rows) => rows.map((x) => (x.id === r.id ? { ...x, contract: nextVal } : x)));
-    try {
-      await api.put(`/customers/${r.id}`, { contract: nextVal });
-      showToast(`Contrat ${nextVal ? 'activé' : 'désactivé'} pour ${r.customer}`);
-    } catch (e) {
-      setAllRows(prev);
-      showToast(e.message);
-    }
-  }
-
   async function exportExcel() {
     const XLSX = await import('exceljs');
     const saveAs = (await import('file-saver')).saveAs;
@@ -564,18 +551,8 @@ function hasActiveColFilter() {
                     <td title={r.siel_id || '—'}>{r.siel_id || '—'}</td>
                     <td title={r.registered_company || '—'}>{r.registered_company || '—'}</td>
                     <td style={{ textAlign: 'center' }} title={r.number_user ?? '—'}>{r.number_user ?? '—'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {isAdmin ? (
-                        <input
-                          type="checkbox"
-                          className="table-checkbox"
-                          checked={!!r.contract}
-                          onChange={(e) => toggleContract(r, e.target.checked ? 1 : 0)}
-                          title="Contrat"
-                        />
-                      ) : (
-                        r.contract ? <span className="badge badge-green">O</span> : <span className="badge badge-gray">N</span>
-                      )}
+                    <td style={{ textAlign: 'center' }} title={r.contract ? 'Contrat actif' : 'Sans contrat'}>
+                      {r.contract ? <span className="badge badge-green">O</span> : <span className="badge badge-gray">N</span>}
                     </td>
                     <td title={r.last_lac || '—'}>{r.last_lac || '—'}</td>
                     <td title={formatDate(r.date_last_lac)}>{formatDate(r.date_last_lac)}</td>
