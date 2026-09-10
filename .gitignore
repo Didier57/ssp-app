@@ -15,6 +15,9 @@ data/
 # Secrets / config locale
 .env
 
+# Données clients réelles (seed) — à ne pas publier
+scripts/data.json
+
 # Journal et artefacts du watchdog NAS
 *.log
 .deploy-*
