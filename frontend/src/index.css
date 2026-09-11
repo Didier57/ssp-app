@@ -599,7 +599,14 @@ table.table th .th-sort {
 
 /* ==== Pages plein écran : les tables occupent toute la hauteur restante ==== */
 .main:has(.clients-page),
-.main:has(.settings-page) { display: flex; flex-direction: column; }
+.main:has(.settings-page) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px);
+  min-height: 0;
+  overflow: hidden;
+  overflow: clip;
+}
 
 .clients-page,
 .settings-page {
