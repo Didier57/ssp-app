@@ -575,8 +575,7 @@ table.table th .th-sort {
 
 /* ==== Table Clients : en-têtes figées + défilement interne ==== */
 .clients-page .table-wrap {
-  flex: 1;
-  min-height: 0;
+  max-height: calc(100vh - 210px);
   overflow: auto;
 }
 .clients-page table.table thead th { position: sticky; top: 0; z-index: 6; }
@@ -591,30 +590,10 @@ table.table th .th-sort {
 
 /* ==== Table Report : en-têtes figées + défilement interne ==== */
 .report-wrap {
-  flex: 1;
-  min-height: 0;
+  max-height: calc(100vh - 190px);
   overflow: auto;
 }
 .report-wrap table.table thead th { position: sticky; top: 0; z-index: 6; }
-
-/* ==== Pages plein écran : les tables occupent toute la hauteur restante ==== */
-.main:has(.clients-page),
-.main:has(.settings-page) {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 52px);
-  min-height: 0;
-  overflow: hidden;
-  overflow: clip;
-}
-
-.clients-page,
-.settings-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
 
 .btn-files {
   display: inline-flex;
