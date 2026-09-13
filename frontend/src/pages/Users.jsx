@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { Plus, Pencil, Trash2, X, Activity, UserX, UserCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Activity, UserX, UserCheck, Send } from 'lucide-react';
 
 const EMPTY = { username: '', email: '', password: '', role: 'lecteur' };
 
@@ -159,6 +159,19 @@ export default function Users() {
     }
   }
 
+  async function handleResend(u) {
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/users/${u.id}/resend-invite`);
+      showToast('Email d\'invitation renvoyé');
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleToggle(u, active) {
     setSaving(true);
     setError('');
@@ -226,6 +239,9 @@ export default function Users() {
                   <td>{u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
                   <td className="row-actions">
                     <button className="btn btn-xs btn-ghost" onClick={() => openEdit(u)} title="Modifier"><Pencil size={13} /></button>
+                    {u.email ? (
+                      <button className="btn btn-xs btn-ghost" onClick={() => handleResend(u)} title="Renvoyer l'email d'invitation" disabled={saving}><Send size={13} /></button>
+                    ) : null}
                     {u.active === 1 ? (
                       me && me.id === u.id ? (
                         <button className="btn btn-xs btn-ghost" disabled title="Vous ne pouvez pas désactiver votre propre compte"><UserX size={13} /></button>

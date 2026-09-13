@@ -11,6 +11,19 @@ router.use(requireAuth);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Envoie (ou renvoie) l'email d'invitation : génère un nouveau token et expédie le lien d'activation
+async function sendInviteEmail({ id, email, username }) {
+  const token = createResetToken(id);
+  await sendPasswordEmailWithToken({
+    to: email,
+    token,
+    subject: 'SSP Openscape — activez votre compte',
+    intro: `Bonjour ${username}, un compte vient de vous être créé sur l'application SSP Openscape. Cliquez ci-dessous pour définir votre mot de passe :`,
+    username,
+    note: 'Ce lien expire dans 72 heures.'
+  });
+}
+
 // Liste des utilisateurs (admin)
 router.get('/', requireAdmin, (req, res) => {
   const rows = db.prepare('SELECT id, username, role, email, active, created_at FROM users ORDER BY username').all();
@@ -38,18 +51,10 @@ router.post('/', requireAdmin, async (req, res) => {
   const info = db.prepare('INSERT INTO users (username, password_hash, role, email) VALUES (?, ?, ?, ?)')
     .run(username, hash, role, vEmail);
 
-  const token = createResetToken(info.lastInsertRowid);
   let emailSent = false;
   if (smtpConfigured()) {
     try {
-      await sendPasswordEmailWithToken({
-        to: vEmail,
-        token,
-        subject: 'SSP Openscape — activez votre compte',
-        intro: `Bonjour ${username}, un compte vient de vous être créé sur l'application SSP Openscape. Cliquez ci-dessous pour définir votre mot de passe :`,
-        username,
-        note: 'Ce lien expire dans 24 heures.'
-      });
+      await sendInviteEmail({ id: info.lastInsertRowid, email: vEmail, username });
       emailSent = true;
     } catch (err) {
       console.error('[users] Échec invitation email:', err.message);
@@ -121,6 +126,32 @@ router.put('/:id', requireAdmin, (req, res) => {
     category: 'user',
     target: `Utilisateur « ${user.username} »`,
     detail: changed.join(', ') || null
+  });
+  res.json({ ok: true });
+});
+
+// Renvoyer l'email d'invitation (admin)
+router.post('/:id/resend-invite', requireAdmin, async (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+  if (!user.email || !EMAIL_RE.test(user.email)) {
+    return res.status(400).json({ error: 'Aucune adresse email valide pour cet utilisateur' });
+  }
+  if (!smtpConfigured()) {
+    return res.status(400).json({ error: 'SMTP non configuré — impossible d\'envoyer l\'email' });
+  }
+  try {
+    await sendInviteEmail({ id: user.id, email: user.email, username: user.username });
+  } catch (err) {
+    console.error('[users] Échec renvoi invitation:', err.message);
+    return res.status(500).json({ error: 'Impossible d\'envoyer l\'email — réessayez plus tard' });
+  }
+  logAudit({
+    user: req.user,
+    action: 'Renvoi de l\'invitation',
+    category: 'user',
+    target: `Utilisateur « ${user.username} »`,
+    detail: `email ${user.email}`
   });
   res.json({ ok: true });
 });
