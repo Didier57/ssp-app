@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../auth');
+const { logAudit } = require('../audit');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -34,6 +35,7 @@ function toCSV(rows) {
 router.get('/csv', (req, res) => {
   const rows = db.prepare('SELECT * FROM customers ORDER BY customer COLLATE NOCASE ASC').all();
   const csv = toCSV(rows);
+  logAudit({ user: req.user, action: 'Export CSV des clients', category: 'customer', detail: `${rows.length} ligne(s)` });
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"');
   res.send(csv);

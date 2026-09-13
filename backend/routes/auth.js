@@ -114,6 +114,7 @@ router.post('/forgot-password', async (req, res) => {
       intro: `Bonjour ${user.username}, une réinitialisation de votre mot de passe a été demandée.`,
       note: 'Ce lien expire dans 72 heures. Si vous n\'êtes pas à l\'origine de cette demande, ignorez cet email.'
     });
+    logAudit({ user, action: 'Demande de réinitialisation de mot de passe', category: 'profile', target: user.username });
     res.json({ ok: true });
   } catch (err) {
     console.error('[auth] Échec envoi email de reset:', err.message);

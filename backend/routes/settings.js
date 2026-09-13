@@ -80,6 +80,7 @@ router.post('/test', async (req, res) => {
       subject: 'SSP Openscape — email de test',
       html: '<p>Test réussi : votre configuration SMTP fonctionne correctement.</p>'
     });
+    logAudit({ user: req.user, action: 'Email de test SMTP', category: 'settings', detail: to });
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -93,6 +94,12 @@ router.post('/send-expiry', async (req, res) => {
       return res.status(400).json({ error: 'Le rappel automatique est désactivé (activez-le dans Paramètres)' });
     }
     const result = await sendExpiryReminder({ force: true });
+    logAudit({
+      user: req.user,
+      action: 'Envoi manuel du rappel d\'expiration',
+      category: 'license',
+      detail: `${result.count != null ? result.count : result.sent || 0} licence(s)`
+    });
     res.json({ ok: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });

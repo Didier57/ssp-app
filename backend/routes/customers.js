@@ -205,6 +205,7 @@ router.get('/:id/files/:fileId/download', (req, res) => {
     'SELECT filename, content FROM customer_files WHERE id = ? AND customer_id = ?'
   ).get(req.params.fileId, req.params.id);
   if (!row) return res.status(404).json({ error: 'Fichier introuvable' });
+  logAudit({ user: req.user, action: 'Téléchargement de fichier', category: 'file', target: row.filename });
   res.setHeader('Content-Disposition', `attachment; filename="${row.filename}"`);
   res.setHeader('Content-Type', 'application/octet-stream');
   res.send(row.content);
