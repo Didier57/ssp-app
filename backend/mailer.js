@@ -67,15 +67,20 @@ function adminEmails() {
     .map((r) => r.email);
 }
 
-// Email de notif de connexion → les admins
+// Email de notif de connexion → les admins (sauf l'utilisateur concerné lui-même)
 async function sendLoginNotification(username, role) {
   if (!getBool('notify.login', false)) return;
   const recipients = adminEmails();
   if (!recipients.length) return;
+  // L'admin qui se connecte ne reçoit pas la notification de sa propre connexion
+  const self = db.prepare('SELECT email FROM users WHERE username = ?').get(username);
+  const selfEmail = self && self.email ? String(self.email).toLowerCase() : '';
+  const targets = recipients.filter((r) => String(r).toLowerCase() !== selfEmail);
+  if (!targets.length) return;
   const moment = new Date().toLocaleString('fr-FR');
   try {
     await sendMail({
-      to: recipients,
+      to: targets,
       subject: 'SSP Openscape — Connexion détectée',
       html: `
         <p>Une connexion a été détectée sur l'application <b>SSP Openscape</b> :</p>
@@ -87,7 +92,7 @@ async function sendLoginNotification(username, role) {
         <p style="color:#666">Si ce n'était pas vous, vérifiez vos comptes.</p>
       `
     });
-    console.log(`[mailer] Notification de connexion envoyée à ${recipients.length} admin(s)`);
+    console.log(`[mailer] Notification de connexion envoyée à ${targets.length} admin(s)`);
   } catch (err) {
     console.error('[mailer] Échec notification de connexion:', err.message);
   }
