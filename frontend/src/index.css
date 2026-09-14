@@ -1037,6 +1037,70 @@ table.table td .badge {
   gap: 10px;
 }
 
+/* ==== Popup de résultat d'import (drag & drop fichiers licence) ==== */
+.drop-result-modal {
+  max-width: 480px;
+}
+.drop-result-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.drop-result-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drop-result-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.drop-result-line.ok { color: var(--success); }
+.drop-result-line.ko { color: var(--danger); }
+.drop-result-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.drop-result-subtitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.drop-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.drop-result-list li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.drop-result-list li:last-child { border-bottom: none; }
+.drop-result-client { font-weight: 600; }
+.drop-result-site { color: var(--muted); }
+.drop-result-count { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.drop-result-errors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.drop-result-errors li {
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
 .close-btn {
   background: none;
   border: none;

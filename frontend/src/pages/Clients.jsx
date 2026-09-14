@@ -6,7 +6,7 @@ import CustomerForm from '../components/CustomerForm.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import ColumnFilter from '../components/ColumnFilter.jsx';
 import LicenseFilesModal from '../components/LicenseFilesModal.jsx';
-import { Plus, FileSpreadsheet, Search, X, Filter, FileArchive, Pencil, Trash2, CalendarRange } from 'lucide-react';
+import { Plus, FileSpreadsheet, Search, X, Filter, FileArchive, Pencil, Trash2, CalendarRange, CircleCheck, CircleX } from 'lucide-react';
 
 function normalizeMac(s) {
   const c = String(s || '').toUpperCase().replace(/[^0-9A-F]/g, '');
@@ -165,6 +165,7 @@ export default function Clients() {
   const [toast, setToast] = useState('');
   const [tableDragOver, setTableDragOver] = useState(false); // fichier licence survolant la table
   const [filesModal, setFilesModal] = useState(null); // client dont on affiche les fichiers
+  const [dropResult, setDropResult] = useState(null); // résultat du drag & drop de fichiers licence
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -338,6 +339,7 @@ function hasActiveColFilter() {
 
     let added = 0;
     const errors = [];
+    const addedClients = new Map(); // id -> { customer, site, count }
     for (const file of files) {
       const fileMac = normalizeMac(extractMac(file.name));
       if (!fileMac) {
@@ -352,16 +354,20 @@ function hasActiveColFilter() {
       try {
         await api.upload(`/customers/${customer.id}/files`, file);
         added++;
+        const cur = addedClients.get(customer.id) || { customer: customer.customer, site: customer.customer_site, count: 0 };
+        cur.count++;
+        addedClients.set(customer.id, cur);
       } catch (err) {
         errors.push(`« ${file.name} » : ${err.message}`);
       }
     }
     if (added) load();
-    if (errors.length) {
-      showToast(`Ajouté(s): ${added} · Rejeté(s): ${errors.length} — ${errors[0]}`);
-    } else if (added) {
-      showToast(`${added} fichier(s) licence ajouté(s)`);
-    }
+    setDropResult({
+      added,
+      failed: errors.length,
+      clients: Array.from(addedClients.values()),
+      errors
+    });
   }
 
   async function handleDelete() {
@@ -615,6 +621,48 @@ function hasActiveColFilter() {
         />
       )}
       {toast && <div className="toast">{toast}</div>}
+
+      {dropResult && (
+        <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setDropResult(null); }}>
+          <div className="modal drop-result-modal">
+            <div className="modal-header">
+              <h3>Import de fichiers licence</h3>
+              <button className="btn btn-icon" onClick={() => setDropResult(null)}><X size={16} /></button>
+            </div>
+            <div className="drop-result-body">
+              <div className="drop-result-summary">
+                <div className="drop-result-line ok"><CircleCheck size={18} /><span>{dropResult.added} fichier(s) ajouté(s)</span></div>
+                <div className="drop-result-line ko"><CircleX size={18} /><span>{dropResult.failed} fichier(s) échoué(s)</span></div>
+              </div>
+              {dropResult.clients.length > 0 && (
+                <div className="drop-result-section">
+                  <div className="drop-result-subtitle">Clients mis à jour</div>
+                  <ul className="drop-result-list">
+                    {dropResult.clients.map((c, i) => (
+                      <li key={i}>
+                        <span className="drop-result-client">{c.customer}</span>
+                        {c.site && <span className="drop-result-site"> — {c.site}</span>}
+                        {c.count > 1 && <span className="drop-result-count">({c.count} fichiers)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {dropResult.errors.length > 0 && (
+                <div className="drop-result-section">
+                  <div className="drop-result-subtitle">Détails des échecs</div>
+                  <ul className="drop-result-errors">
+                    {dropResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-sm btn-ghost" onClick={() => setDropResult(null)}>Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {filesModal && (
         <LicenseFilesModal
