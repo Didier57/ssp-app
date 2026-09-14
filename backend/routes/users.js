@@ -26,7 +26,7 @@ async function sendInviteEmail({ id, email, username }) {
 
 // Liste des utilisateurs (admin)
 router.get('/', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, username, role, email, active, created_at FROM users ORDER BY username').all();
+  const rows = db.prepare('SELECT id, username, role, email, active, totp_enabled, created_at FROM users ORDER BY username').all();
   res.json(rows);
 });
 
@@ -152,6 +152,36 @@ router.post('/:id/resend-invite', requireAdmin, async (req, res) => {
     category: 'user',
     target: `Utilisateur « ${user.username} »`,
     detail: `email ${user.email}`
+  });
+  res.json({ ok: true });
+});
+
+// Réinitialiser la double authentification d'un utilisateur (perte de l'application) :
+// efface le secret et désactive le 2FA — l'utilisateur pourra se reconnecter par mot de passe
+// puis se réinscrire depuis son profil.
+router.post('/:id/reset-2fa', requireAdmin, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+  db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(user.id);
+  logAudit({
+    user: req.user,
+    action: 'Réinitialisation de la 2FA d\'un utilisateur',
+    category: 'user',
+    target: `Utilisateur « ${user.username} »`
+  });
+  res.json({ ok: true });
+});
+
+// Désactiver la double authentification d'un utilisateur (conserve le secret pour réactivation)
+router.post('/:id/disable-2fa', requireAdmin, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+  db.prepare('UPDATE users SET totp_enabled = 0 WHERE id = ?').run(user.id);
+  logAudit({
+    user: req.user,
+    action: 'Désactivation de la 2FA d\'un utilisateur',
+    category: 'user',
+    target: `Utilisateur « ${user.username} »`
   });
   res.json({ ok: true });
 });

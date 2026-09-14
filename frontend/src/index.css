@@ -415,6 +415,36 @@ body {
 
 .error-banner.full { grid-column: 1 / -1; }
 
+/* ==== Double authentification (2FA) ==== */
+.twofa-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+.twofa-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.twofa-heading svg { color: var(--primary); flex-shrink: 0; }
+.twofa-setup {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.qr-box {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.twofa-setup-info { flex: 1; min-width: 220px; }
+.twofa-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

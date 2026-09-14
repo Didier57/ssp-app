@@ -1,10 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const db = require('../db');
-const { sign, requireAuth } = require('../auth');
+const { sign, signPending, requireAuth } = require('../auth');
+const { JWT_SECRET } = require('../config');
 const { sendLoginNotification, sendPasswordEmailWithToken, smtpConfigured } = require('../mailer');
 const { createResetToken, consumeResetToken } = require('../reset-token');
 const { logAudit } = require('../audit');
+const { generateSecret, getOtpAuthUrl, verifyTotp } = require('../totp');
 
 const router = express.Router();
 
@@ -24,6 +27,11 @@ router.post('/login', (req, res) => {
     logAudit({ username: user.username, action: 'Tentative de connexion (compte désactivé)', category: 'login' });
     return res.status(401).json({ error: 'Compte désactivé — contactez un administrateur' });
   }
+  // Double authentification : on demande le code avant d'émettre le JWT définitif
+  if (user.totp_enabled === 1) {
+    logAudit({ user, action: 'Connexion — code 2FA demandé', category: 'login', target: user.username });
+    return res.json({ totpRequired: true, pendingToken: signPending(user) });
+  }
   // Notification de connexion aux admins (si activée) — non bloquant
   sendLoginNotification(user.username, user.role);
   logAudit({ user, action: 'Connexion', category: 'login', target: user.username });
@@ -34,6 +42,76 @@ router.get('/me', requireAuth, (req, res) => {
   const user = db.prepare('SELECT id, username, role, email FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(401).json({ error: 'Utilisateur introuvable' });
   res.json(user);
+});
+
+// Étape 2 de la connexion : validation du code à deux facteurs
+router.post('/login/verify', (req, res) => {
+  const { pendingToken, code } = req.body || {};
+  if (!pendingToken || !code) return res.status(400).json({ error: 'Code requis' });
+  let payload;
+  try {
+    payload = jwt.verify(pendingToken, JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Session expirée — reconnectez-vous' });
+  }
+  if (!payload.totpPending) return res.status(400).json({ error: 'Jeton invalide' });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+  if (!user || user.active !== 1) return res.status(401).json({ error: 'Compte désactivé' });
+  if (user.totp_enabled !== 1 || !user.totp_secret) {
+    return res.status(400).json({ error: 'Double authentification non activée' });
+  }
+  if (!verifyTotp(user.totp_secret, String(code))) {
+    logAudit({ user, action: 'Échec de la vérification 2FA', category: 'login', target: user.username });
+    return res.status(401).json({ error: 'Code invalide' });
+  }
+  sendLoginNotification(user.username, user.role);
+  logAudit({ user, action: 'Connexion (2FA validé)', category: 'login', target: user.username });
+  res.json({ token: sign(user), user: { id: user.id, username: user.username, role: user.role, email: user.email } });
+});
+
+// === Double authentification (auto-gestion) ===
+
+// Statut actuel
+router.get('/2fa/status', requireAuth, (req, res) => {
+  const u = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id);
+  res.json({ enabled: !!(u && u.totp_enabled === 1) });
+});
+
+// Démarrer l'activation : génère un secret (non encore activé tant que non confirmé)
+router.post('/2fa/setup', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(401).json({ error: 'Utilisateur introuvable' });
+  if (user.totp_enabled === 1) {
+    return res.status(400).json({ error: 'La double authentification est déjà active' });
+  }
+  const secret = generateSecret();
+  db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(secret, user.id);
+  res.json({ secret, otpauthUrl: getOtpAuthUrl({ username: user.username, secret }), issuer: 'SSP Openscape' });
+});
+
+// Confirmer l'activation en fournissant un code valide
+router.post('/2fa/enable', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(401).json({ error: 'Utilisateur introuvable' });
+  if (!user.totp_secret) return res.status(400).json({ error: 'Initialisation requise' });
+  const code = String((req.body || {}).code || '').trim();
+  if (!verifyTotp(user.totp_secret, code)) return res.status(400).json({ error: 'Code invalide' });
+  db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(user.id);
+  logAudit({ user, action: 'Activation de la double authentification', category: 'profile', target: user.username });
+  res.json({ ok: true });
+});
+
+// Désactiver (nécessite le mot de passe actuel pour prouver son identité)
+router.post('/2fa/disable', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(401).json({ error: 'Utilisateur introuvable' });
+  const { currentPassword } = req.body || {};
+  if (!currentPassword || !bcrypt.compareSync(currentPassword, user.password_hash)) {
+    return res.status(400).json({ error: 'Mot de passe actuel incorrect' });
+  }
+  db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(user.id);
+  logAudit({ user, action: 'Désactivation de la double authentification', category: 'profile', target: user.username });
+  res.json({ ok: true });
 });
 
 // L'utilisateur modifie ses propres informations (username, email, mot de passe)

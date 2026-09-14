@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { Plus, Pencil, Trash2, X, Activity, UserX, UserCheck, Send } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Activity, UserX, UserCheck, Send, ShieldOff, RotateCcw } from 'lucide-react';
 
 const EMPTY = { username: '', email: '', password: '', role: 'lecteur' };
 
@@ -29,6 +29,7 @@ export default function Users() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(null); // utilisateur à désactiver
+  const [confirm2fa, setConfirm2fa] = useState(null); // { user, action: 'reset' | 'disable' }
   const [toast, setToast] = useState('');
   const [tempPass, setTempPass] = useState(null); // mot de passe provisoire si l'email n'a pas pu partir
 
@@ -188,6 +189,24 @@ export default function Users() {
     }
   }
 
+  async function handle2fa() {
+    if (!confirm2fa) return;
+    const { user, action } = confirm2fa;
+    setSaving(true);
+    setError('');
+    try {
+      await api.post(`/users/${user.id}/${action === 'reset' ? 'reset-2fa' : 'disable-2fa'}`);
+      setConfirm2fa(null);
+      showToast(action === 'reset' ? '2FA réinitialisé — nouvel enregistrement requis' : '2FA désactivé');
+      load();
+    } catch (err) {
+      setConfirm2fa(null);
+      showToast(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -216,6 +235,7 @@ export default function Users() {
                 <th>Email</th>
                 <th style={{ width: 140 }}>Rôle</th>
                 <th style={{ width: 90 }}>Statut</th>
+                <th style={{ width: 80 }}>2FA</th>
                 <th style={{ width: 140 }}>Créé le</th>
                 <th style={{ width: 150 }}>Actions</th>
               </tr>
@@ -236,6 +256,11 @@ export default function Users() {
                       ? <span className="badge badge-green">Actif</span>
                       : <span className="badge badge-red">Inactif</span>}
                   </td>
+                  <td>
+                    {u.totp_enabled === 1
+                      ? <span className="badge badge-blue">Activée</span>
+                      : <span className="badge badge-gray">—</span>}
+                  </td>
                   <td>{u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
                   <td className="row-actions">
                     <button className="btn btn-xs btn-ghost" onClick={() => openEdit(u)} title="Modifier"><Pencil size={13} /></button>
@@ -251,6 +276,12 @@ export default function Users() {
                     ) : (
                       <button className="btn btn-xs btn-ghost" onClick={() => handleToggle(u, 1)} title="Réactiver le compte"><UserCheck size={13} /></button>
                     )}
+                    {u.totp_enabled === 1 ? (
+                      <>
+                        <button className="btn btn-xs btn-ghost" onClick={() => setConfirm2fa({ user: u, action: 'reset' })} title="Réinitialiser la 2FA (perte de l'application d'authentification)" disabled={saving}><RotateCcw size={13} /></button>
+                        <button className="btn btn-xs btn-ghost" onClick={() => setConfirm2fa({ user: u, action: 'disable' })} title="Désactiver la 2FA" disabled={saving}><ShieldOff size={13} /></button>
+                      </>
+                    ) : null}
                     <button className="btn btn-xs btn-danger" onClick={() => openConfirmDelete(u)} title="Supprimer"><Trash2 size={13} /></button>
                   </td>
                 </tr>
@@ -362,6 +393,21 @@ export default function Users() {
           onConfirm={() => handleToggle(confirmToggle, 0)}
           loading={saving}
           confirmLabel="Désactiver"
+        />
+      )}
+
+      {confirm2fa && (
+        <ConfirmDialog
+          title={confirm2fa.action === 'reset' ? 'Réinitialiser la double authentification ?' : 'Désactiver la double authentification ?'}
+          message={
+            confirm2fa.action === 'reset'
+              ? `Le secret 2FA du compte « ${confirm2fa.user.username} » sera supprimé. L'utilisateur pourra se reconnecter avec son mot de passe puis se réinscrire depuis son profil (utile en cas de perte de l'application d'authentification).`
+              : `La double authentification du compte « ${confirm2fa.user.username} » sera désactivée : la connexion se fera par simple mot de passe.`
+          }
+          onCancel={() => setConfirm2fa(null)}
+          onConfirm={handle2fa}
+          loading={saving}
+          confirmLabel={confirm2fa.action === 'reset' ? 'Réinitialiser' : 'Désactiver'}
         />
       )}
 

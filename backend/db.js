@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'lecteur',
     email TEXT,
     active INTEGER NOT NULL DEFAULT 1,
+    totp_secret TEXT,
+    totp_enabled INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
   );
 
@@ -137,6 +139,12 @@ if (!userCols.some((c) => c.name === 'email')) {
 }
 if (!userCols.some((c) => c.name === 'active')) {
   db.exec('ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1');
+}
+if (!userCols.some((c) => c.name === 'totp_secret')) {
+  db.exec('ALTER TABLE users ADD COLUMN totp_secret TEXT');
+}
+if (!userCols.some((c) => c.name === 'totp_enabled')) {
+  db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0');
 }
 
 module.exports = db;

@@ -16,12 +16,21 @@ export default function Login() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
+  const [otpPending, setOtpPending] = useState(''); // token temporaire en attente de code 2FA
+  const [otpCode, setOtpCode] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       const res = await api.login(username, password);
+      if (res.totpRequired) {
+        setOtpPending(res.pendingToken);
+        setOtpCode('');
+        return;
+      }
       setSession(res.token, res.user);
       login(res.user);
       navigate('/', { replace: true });
@@ -29,6 +38,22 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleOtp(e) {
+    e.preventDefault();
+    setError('');
+    setOtpLoading(true);
+    try {
+      const res = await api.post('/auth/login/verify', { pendingToken: otpPending, code: otpCode });
+      setSession(res.token, res.user);
+      login(res.user);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOtpLoading(false);
     }
   }
 
@@ -44,6 +69,42 @@ export default function Login() {
     } finally {
       setResetLoading(false);
     }
+  }
+
+  if (otpPending) {
+    return (
+      <div className="login-wrap">
+        <form className="login-card" onSubmit={handleOtp}>
+          <div className="logo">✆</div>
+          <h1>Double authentification</h1>
+          <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            Saisissez le code à 6 chiffres affiché dans votre application
+            d'authentification (Bitwarden, Authenticator, Duo Mobile…).
+          </p>
+          {error && <div className="error-banner">{error}</div>}
+          <div className="field">
+            <label>Code de vérification</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              autoFocus
+              style={{ fontSize: 20, letterSpacing: 6, textAlign: 'center' }}
+            />
+          </div>
+          <button className="btn btn-primary btn-block" disabled={otpLoading || otpCode.length !== 6}>
+            {otpLoading ? <span className="spinner" /> : 'Valider'}
+          </button>
+          <button type="button" className="btn btn-ghost btn-block" onClick={() => { setOtpPending(''); setError(''); }} style={{ marginTop: 8 }}>
+            ← Retour à la connexion
+          </button>
+        </form>
+      </div>
+    );
   }
 
   if (mode === 'forgot') {
