@@ -24,6 +24,7 @@
   --code-bg: #f8fafc;
   --control-border: #cbd5e1;
   --chip-bg: #eef2f7;
+  --th-frame: #64748b;
 }
 
 [data-theme="dark"] {
@@ -43,6 +44,7 @@
   --code-bg: #1a2333;
   --control-border: #334155;
   --chip-bg: #1e293b;
+  --th-frame: #475569;
 }
 
 body {
@@ -668,12 +670,17 @@ table.table th .th-sort {
 }
 .freelicenses-page table.table th .filter-funnel { position: static; flex-shrink: 0; }
 
-/* ==== Cadre (bordures) autour de la ligne d'en-tête des tables ==== */
+/* ==== Cadre (bordures) autour de la ligne d'en-tête des tables ====
+   box-shadow = colle correctement à l'en-tête sticky (contrairement à border) */
 .clients-page table.table thead th,
 .report-wrap table.table thead th,
 .freelicenses-page table.table thead th {
-  border: 1px solid var(--control-border);
-  border-bottom: 2px solid var(--control-border);
+  border: none;
+  box-shadow:
+    inset 0 1px 0 var(--th-frame),
+    inset 1px 0 0 var(--th-frame),
+    inset -1px 0 0 var(--th-frame),
+    inset 0 -2px 0 var(--th-frame);
 }
 
 .btn-files {
