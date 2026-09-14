@@ -668,6 +668,14 @@ table.table th .th-sort {
 }
 .freelicenses-page table.table th .filter-funnel { position: static; flex-shrink: 0; }
 
+/* ==== Cadre (bordures) autour de la ligne d'en-tête des tables ==== */
+.clients-page table.table thead th,
+.report-wrap table.table thead th,
+.freelicenses-page table.table thead th {
+  border: 1px solid var(--control-border);
+  border-bottom: 2px solid var(--control-border);
+}
+
 .btn-files {
   display: inline-flex;
   align-items: center;
