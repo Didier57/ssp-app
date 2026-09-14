@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     active INTEGER NOT NULL DEFAULT 1,
     totp_secret TEXT,
     totp_enabled INTEGER NOT NULL DEFAULT 0,
+    last_login_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
   );
 
@@ -162,6 +163,9 @@ if (!userCols.some((c) => c.name === 'totp_secret')) {
 }
 if (!userCols.some((c) => c.name === 'totp_enabled')) {
   db.exec('ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0');
+}
+if (!userCols.some((c) => c.name === 'last_login_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT');
 }
 
 module.exports = db;

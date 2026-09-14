@@ -34,6 +34,7 @@ router.post('/login', (req, res) => {
   }
   // Notification de connexion aux admins (si activée) — non bloquant
   sendLoginNotification(user.username, user.role);
+  db.prepare("UPDATE users SET last_login_at = datetime('now','localtime') WHERE id = ?").run(user.id);
   logAudit({ user, action: 'Connexion', category: 'login', target: user.username });
   res.json({ token: sign(user), user: { id: user.id, username: user.username, role: user.role, email: user.email } });
 });
@@ -65,6 +66,7 @@ router.post('/login/verify', (req, res) => {
     return res.status(401).json({ error: 'Code invalide' });
   }
   sendLoginNotification(user.username, user.role);
+  db.prepare("UPDATE users SET last_login_at = datetime('now','localtime') WHERE id = ?").run(user.id);
   logAudit({ user, action: 'Connexion (2FA validé)', category: 'login', target: user.username });
   res.json({ token: sign(user), user: { id: user.id, username: user.username, role: user.role, email: user.email } });
 });

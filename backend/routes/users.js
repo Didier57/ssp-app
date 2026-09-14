@@ -26,7 +26,7 @@ async function sendInviteEmail({ id, email, username }) {
 
 // Liste des utilisateurs (admin)
 router.get('/', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, username, role, email, active, totp_enabled, created_at FROM users ORDER BY username').all();
+  const rows = db.prepare('SELECT id, username, role, email, active, totp_enabled, created_at, last_login_at FROM users ORDER BY username').all();
   res.json(rows);
 });
 

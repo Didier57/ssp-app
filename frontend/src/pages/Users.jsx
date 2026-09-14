@@ -237,6 +237,7 @@ export default function Users() {
                 <th style={{ width: 90 }}>Statut</th>
                 <th style={{ width: 80 }}>2FA</th>
                 <th style={{ width: 140 }}>Créé le</th>
+                <th style={{ width: 140 }}>Dernière connexion</th>
                 <th style={{ width: 150 }}>Actions</th>
               </tr>
             </thead>
@@ -262,6 +263,7 @@ export default function Users() {
                       : <span className="badge badge-gray">—</span>}
                   </td>
                   <td>{u.created_at ? u.created_at.slice(0, 10) : '—'}</td>
+                  <td>{u.last_login_at ? u.last_login_at.slice(0, 16) : '—'}</td>
                   <td className="row-actions">
                     <button className="btn btn-xs btn-ghost" onClick={() => openEdit(u)} title="Modifier"><Pencil size={13} /></button>
                     {u.email ? (
