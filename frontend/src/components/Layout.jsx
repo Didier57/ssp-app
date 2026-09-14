@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, FileBarChart2, Table, UserCog, Settings, UserCircle, LogOut, DatabaseBackup, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, Users, FileBarChart2, Table, UserCog, Settings, UserCircle, LogOut, DatabaseBackup, Moon, Sun, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../App.jsx';
 import ProfileModal from './ProfileModal.jsx';
 
@@ -42,6 +42,9 @@ export default function Layout() {
           </NavLink>
           <NavLink to="/tcd">
             <Table size={16} /> TCD
+          </NavLink>
+          <NavLink to="/freelicenses">
+            <BadgeCheck size={16} /> Free Licences
           </NavLink>
           {isAdmin && (
             <NavLink to="/users">

@@ -116,6 +116,23 @@ CREATE TABLE IF NOT EXISTS password_resets (
   CREATE INDEX IF NOT EXISTS idx_licenses_lac ON licenses(lac);
   CREATE INDEX IF NOT EXISTS idx_licenses_siel ON licenses(siel_norm);
 
+  CREATE TABLE IF NOT EXISTS free_licenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lac TEXT,
+    total_quantity INTEGER NOT NULL DEFAULT 0,
+    feature_num TEXT,
+    feature TEXT,
+    create_date TEXT,
+    expire_date TEXT,
+    sales_order TEXT,
+    delivery_note TEXT,
+    purchase_order TEXT,
+    license_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_free_licenses_lac ON free_licenses(lac);
+
   CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),

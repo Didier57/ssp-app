@@ -23,6 +23,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/report', require('./routes/report'));
+app.use('/api/freelicenses', require('./routes/freelicenses'));
 app.use('/api/tcd', require('./routes/tcd'));
 app.use('/api/activity', require('./routes/activity'));
 

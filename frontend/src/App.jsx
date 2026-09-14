@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Clients from './pages/Clients.jsx';
 import Report from './pages/Report.jsx';
 import TCD from './pages/TCD.jsx';
+import FreeLicences from './pages/FreeLicences.jsx';
 import Users from './pages/Users.jsx';
 import Settings from './pages/Settings.jsx';
 import Backup from './pages/Backup.jsx';
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/report" element={<Report />} />
           <Route path="/tcd" element={<TCD />} />
+          <Route path="/freelicenses" element={<FreeLicences />} />
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
           <Route path="/settings" element={<RequireAdmin><Settings /></RequireAdmin>} />
           <Route path="/backup" element={<RequireAdmin><Backup /></RequireAdmin>} />

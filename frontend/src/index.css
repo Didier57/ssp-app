@@ -653,6 +653,21 @@ table.table th .th-sort {
 }
 .report-wrap table.table thead th { position: sticky; top: 0; z-index: 6; }
 
+/* ==== Table Free Licences : en-têtes figées + défilement interne ==== */
+.freelicenses-page .table-wrap {
+  max-height: calc(100vh - 210px);
+  overflow: auto;
+}
+.freelicenses-page table.table thead th { position: sticky; top: 0; z-index: 6; }
+.freelicenses-page table.table th .th-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+}
+.freelicenses-page table.table th .filter-funnel { position: static; flex-shrink: 0; }
+
 .btn-files {
   display: inline-flex;
   align-items: center;
