@@ -382,8 +382,18 @@ export default function FreeLicences() {
             placeholder="Rechercher (LAC, feature, commande, licence)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: 30 }}
+            style={{ paddingLeft: 30, paddingRight: 28 }}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              title="Effacer la recherche"
+              style={{ position: 'absolute', right: 8, top: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
         <button className="btn btn-xs btn-ghost" onClick={clearFilters}><X size={12} /> Réinitialiser</button>
       </div>

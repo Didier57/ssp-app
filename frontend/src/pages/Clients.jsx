@@ -438,8 +438,18 @@ function hasActiveColFilter() {
             placeholder="Rechercher (nom, site, MAC, SIEL, LAC)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: 30 }}
+            style={{ paddingLeft: 30, paddingRight: 28 }}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              title="Effacer la recherche"
+              style={{ position: 'absolute', right: 8, top: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
         <div className="toolbar-date">
           <span className="toolbar-date-label" title="Filtrer sur la colonne Date last LAC">
