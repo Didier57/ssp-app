@@ -328,7 +328,6 @@ function hasActiveColFilter() {
   async function handleFileDrop(e) {
     e.preventDefault();
     setTableDragOver(false);
-    if (!isAdmin) { showToast('Seul un administrateur peut ajouter un fichier licence.'); return; }
     let files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
     if (!files.length && e.dataTransfer && e.dataTransfer.items) {
       files = Array.from(e.dataTransfer.items)
@@ -464,7 +463,6 @@ function hasActiveColFilter() {
         className={`table-wrap${tableDragOver ? ' drag-over' : ''}`}
         ref={wrapRef}
         onDragOver={(e) => {
-          if (!isAdmin) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
           if (!tableDragOver) setTableDragOver(true);

@@ -162,7 +162,7 @@ router.get('/:id/files', (req, res) => {
 });
 
 // POST /api/customers/:id/files - upload drag & drop (vérifie la MAC du nom de fichier)
-router.post('/:id/files', requireAdmin, upload.single('file'), (req, res) => {
+router.post('/:id/files', upload.single('file'), (req, res) => {
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!customer) return res.status(404).json({ error: 'Client introuvable' });
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
