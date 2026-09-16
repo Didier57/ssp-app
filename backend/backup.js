@@ -64,6 +64,33 @@ function importRows(table, rows) {
   return rows.length;
 }
 
+// Réinsère les métadonnées des fichiers de licence en préservant le contenu binaire
+// des fichiers qui existent encore. Les références sans contenu (fichiers vides,
+// ex. après une ancienne restauration Excel) sont ignorées : la référence est effacée.
+function importCustomerFiles(rows, existingFiles) {
+  if (!rows || !rows.length) return 0;
+  const columns = tableColumns('customer_files').filter((c) => c !== 'content');
+  if (!columns.length) return 0;
+  const stmt = db.prepare(
+    `INSERT INTO customer_files (${columns.map((c) => `"${c}"`).join(', ')}, content)
+     VALUES (${columns.map(() => '?').join(', ')}, ?)`
+  );
+  let inserted = 0;
+  for (const r of rows) {
+    const content =
+      existingFiles.get(`${r.customer_id}|${r.filename}`) ||
+      (r.mac_address ? existingFiles.get(`mac|${normalizeMac(r.mac_address)}`) : undefined);
+    if (!content) continue;
+    const vals = columns.map((c) => {
+      if (c === 'size') return content.length;
+      return (r[c] === undefined || r[c] === '') ? null : r[c];
+    });
+    stmt.run(...vals, content);
+    inserted++;
+  }
+  return inserted;
+}
+
 // Reconstruit la base à partir du classeur. Remplace le contenu complet des
 // tables de sauvegarde (idempotent : rejouable après une erreur).
 function importBackup(buffer) {
@@ -76,13 +103,29 @@ function importBackup(buffer) {
     .prepare(`SELECT id, username, password_hash, role, email, created_at FROM users WHERE role = 'admin'`)
     .all();
 
+  // Sauvegarde le contenu binaire des fichiers de licence déjà présents : l'Excel ne
+  // stocke que les métadonnées, on ne doit donc pas perdre les octets lors de la
+  // restauration. Les références sans contenu seront, elles, supprimées.
+  const existingFiles = new Map();
+  for (const f of db
+    .prepare('SELECT customer_id, filename, mac_address, content FROM customer_files WHERE content IS NOT NULL')
+    .all()) {
+    existingFiles.set(`${f.customer_id}|${f.filename}`, f.content);
+    const mac = normalizeMac(f.mac_address);
+    if (mac) existingFiles.set(`mac|${mac}`, f.content);
+  }
+
   const tx = db.transaction(() => {
     for (const t of restore) {
       db.prepare(`DELETE FROM ${t.name}`).run();
     }
     for (const t of restore) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[t.name], { defval: '', raw: false });
-      importRows(t.name, rows);
+      if (t.name === 'customer_files') {
+        importCustomerFiles(rows, existingFiles);
+      } else {
+        importRows(t.name, rows);
+      }
     }
   });
   tx();
