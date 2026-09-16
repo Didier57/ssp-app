@@ -1,15 +1,18 @@
 import React, { useRef, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert } from 'lucide-react';
+import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive } from 'lucide-react';
 
 export default function Backup() {
   const fileRef = useRef(null);
+  const zipRef = useRef(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [confirmFile, setConfirmFile] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [confirmZip, setConfirmZip] = useState(null);
+  const [importingZip, setImportingZip] = useState(false);
 
   function showToast(msg) {
     setToast(msg);
@@ -22,6 +25,19 @@ export default function Backup() {
     try {
       await api.download('/backup/export');
       showToast('Export Excel de la base généré');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function handleExportZip() {
+    setBusy('zip');
+    setError('');
+    try {
+      await api.download('/backup/files');
+      showToast('Export ZIP des fichiers de licence généré');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -48,6 +64,12 @@ export default function Backup() {
     e.target.value = '';
   }
 
+  function onZipChosen(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) setConfirmZip(f);
+    e.target.value = '';
+  }
+
   async function handleImport() {
     if (!confirmFile) return;
     setImporting(true);
@@ -60,6 +82,21 @@ export default function Backup() {
     } finally {
       setImporting(false);
       setConfirmFile(null);
+    }
+  }
+
+  async function handleImportZip() {
+    if (!confirmZip) return;
+    setImportingZip(true);
+    setError('');
+    try {
+      const r = await api.upload('/backup/import-files', confirmZip);
+      showToast(r.message);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setImportingZip(false);
+      setConfirmZip(null);
     }
   }
 
@@ -100,6 +137,26 @@ export default function Backup() {
         </div>
       </div>
 
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-title">
+          <FileArchive size={16} /> Fichiers de licence
+        </div>
+        <p style={{ margin: '0 0 14px', color: 'var(--text-secondary)', fontSize: 13 }}>
+          Le fichier ZIP contient tous les fichiers de licence (contenu binaire) accompagnés d'un
+          manifeste. Il permet de restaurer ces fichiers après un incident (ex. réimport après une
+          restauration Excel, qui ne contient que la liste des fichiers sans leur contenu).
+        </p>
+        <div className="backup-actions">
+          <button className="btn btn-primary" onClick={handleExportZip} disabled={!!busy}>
+            <FileArchive size={16} />&nbsp;{busy === 'zip' ? <span className="spinner" /> : <Download size={15} />}&nbsp;<span>Exporter les licences (ZIP)</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => zipRef.current.click()} disabled={!!busy}>
+            <Upload size={15} /> Importer un fichier ZIP…
+          </button>
+          <input ref={zipRef} type="file" accept=".zip,application/zip" style={{ display: 'none' }} onChange={onZipChosen} />
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel-title">
           <FileSpreadsheet size={16} /> Restaurer après incident
@@ -122,6 +179,17 @@ export default function Backup() {
           loading={importing}
           onCancel={() => setConfirmFile(null)}
           onConfirm={handleImport}
+        />
+      )}
+
+      {confirmZip && (
+        <ConfirmDialog
+          title="Restaurer les fichiers de licence depuis un ZIP ?"
+          message={`Le fichier « ${confirmZip.name} » va réimporter les fichiers de licence. Les fichiers manquants seront ajoutés, les fichiers existants seront mis à jour. Confirmez-vous l'import ?`}
+          confirmLabel="Importer"
+          loading={importingZip}
+          onCancel={() => setConfirmZip(null)}
+          onConfirm={handleImportZip}
         />
       )}
     </div>

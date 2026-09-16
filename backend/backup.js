@@ -1,4 +1,5 @@
 const XLSX = require('xlsx');
+const AdmZip = require('adm-zip');
 const db = require('./db');
 
 // Tables exportées dans le classeur Excel (un onglet par table).
@@ -106,4 +107,141 @@ function backupFilename() {
   return `ssp_backup_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.xlsx`;
 }
 
-module.exports = { buildBackupWorkbook, importBackup, backupFilename, summary };
+// ==== Fichiers de licence (contenu binaire) ====
+
+// Normalise une MAC (même logique que routes/customers.js) en "00-1A-E8-C6-19-26"
+function normalizeMac(s) {
+  const clean = String(s || '').toUpperCase().replace(/[^0-9A-F]/g, '');
+  if (clean.length !== 12) return '';
+  return clean.replace(/(.{2})(?=.)/g, '$1-');
+}
+
+function filesZipFilename() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `ssp_licences_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.zip`;
+}
+
+// Construit un ZIP contenant tous les fichiers de licence (contenu BLOB) + un manifest.json
+function buildFilesZip() {
+  const rows = db
+    .prepare(
+      `SELECT f.id, f.customer_id, f.filename, f.mac_address, f.content, f.size,
+              f.uploaded_at, f.uploaded_by, c.customer, c.customer_site
+       FROM customer_files f
+       LEFT JOIN customers c ON c.id = f.customer_id
+       ORDER BY f.id ASC`
+    )
+    .all();
+
+  const zip = new AdmZip();
+  const manifest = rows.map((r, i) => ({
+    filename: r.filename,
+    customer_id: r.customer_id,
+    customer: r.customer || null,
+    customer_site: r.customer_site || null,
+    mac_address: r.mac_address || null,
+    size: r.size,
+    uploaded_at: r.uploaded_at,
+    uploaded_by: r.uploaded_by || null,
+    entry: `licences/${i}`
+  }));
+
+  rows.forEach((r, i) => {
+    if (r.content != null) zip.addFile(`licences/${i}`, r.content);
+  });
+  zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2), 'utf8'));
+  return zip.toBuffer();
+}
+
+// Retrouve le client correspondant à une entrée du manifest (id → MAC → nom+site)
+function findCustomerForEntry(m) {
+  if (m.customer_id) {
+    const c = db.prepare('SELECT id FROM customers WHERE id = ?').get(m.customer_id);
+    if (c) return c;
+  }
+  const mac = normalizeMac(m.mac_address);
+  if (mac) {
+    const rows = db.prepare('SELECT id, mac_address FROM customers').all();
+    const found = rows.find((r) => normalizeMac(r.mac_address) === mac);
+    if (found) return found;
+  }
+  if (m.customer) {
+    const c = m.customer_site
+      ? db.prepare('SELECT id FROM customers WHERE customer = ? AND customer_site = ?').get(m.customer, m.customer_site)
+      : db.prepare('SELECT id FROM customers WHERE customer = ?').get(m.customer);
+    if (c) return c;
+  }
+  return null;
+}
+
+// Restaure les fichiers de licence depuis un ZIP (manifest.json + contenus).
+// Ajoute les nouveaux fichiers, met à jour le contenu des fichiers déjà présents.
+function importFilesZip(buffer) {
+  const zip = new AdmZip(buffer);
+  const manifestEntry = zip.getEntry('manifest.json');
+  if (!manifestEntry) throw new Error('Manifest introuvable dans le ZIP');
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestEntry.getData().toString('utf8'));
+  } catch (e) {
+    throw new Error('Manifest JSON invalide');
+  }
+  if (!Array.isArray(manifest)) throw new Error('Manifest invalide');
+
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  let missing = 0;
+
+  const tx = db.transaction(() => {
+    for (const m of manifest) {
+      const customer = findCustomerForEntry(m);
+      if (!customer) {
+        skipped++;
+        continue;
+      }
+      const content = m.entry ? zip.readFile(m.entry) : null;
+      if (!content) {
+        missing++;
+        continue;
+      }
+      const existing = db
+        .prepare('SELECT id FROM customer_files WHERE customer_id = ? AND filename = ?')
+        .get(customer.id, m.filename);
+      if (existing) {
+        db.prepare(
+          'UPDATE customer_files SET content = ?, size = ?, mac_address = ?, uploaded_by = ? WHERE id = ?'
+        ).run(content, content.length, m.mac_address || null, m.uploaded_by || null, existing.id);
+        updated++;
+      } else {
+        db.prepare(
+          `INSERT INTO customer_files (customer_id, filename, mac_address, content, size, uploaded_at, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          customer.id,
+          m.filename,
+          m.mac_address || null,
+          content,
+          content.length,
+          m.uploaded_at || null,
+          m.uploaded_by || null
+        );
+        added++;
+      }
+    }
+  });
+  tx();
+
+  return { added, updated, skipped, missing, total: manifest.length };
+}
+
+module.exports = {
+  buildBackupWorkbook,
+  importBackup,
+  buildFilesZip,
+  importFilesZip,
+  backupFilename,
+  filesZipFilename,
+  summary
+};

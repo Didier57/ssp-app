@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
-const { buildBackupWorkbook, importBackup, backupFilename } = require('../backup');
+const { buildBackupWorkbook, importBackup, buildFilesZip, importFilesZip, backupFilename, filesZipFilename } = require('../backup');
 const { sendMail, smtpConfigured } = require('../mailer');
 const { logAudit } = require('../audit');
 
@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(requireAuth, requireAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const zipUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -21,6 +22,31 @@ router.get('/export', (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${backupFilename()}"`);
   res.setHeader('Content-Length', buf.length);
   res.send(buf);
+});
+
+// GET /api/backup/files — télécharge le ZIP des fichiers de licence
+router.get('/files', (req, res) => {
+  const buf = buildFilesZip();
+  logAudit({ user: req.user, action: 'Export des fichiers de licence (ZIP)', category: 'backup', target: filesZipFilename() });
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="${filesZipFilename()}"`);
+  res.setHeader('Content-Length', buf.length);
+  res.send(buf);
+});
+
+// POST /api/backup/import-files — restaure les fichiers de licence depuis un ZIP
+router.post('/import-files', zipUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Fichier ZIP manquant' });
+  }
+  try {
+    const result = importFilesZip(req.file.buffer);
+    const message = `${result.added} ajouté(s), ${result.updated} mis à jour, ${result.skipped} client(s) non trouvé(s), ${result.missing} sans contenu`;
+    logAudit({ user: req.user, action: 'Restauration des fichiers de licence (ZIP)', category: 'backup', target: req.file.originalname });
+    res.json({ ok: true, message, ...result });
+  } catch (e) {
+    res.status(400).json({ error: `Import ZIP impossible : ${e.message}` });
+  }
 });
 
 // POST /api/backup/import — restaure la base depuis un classeur sauvegardé
