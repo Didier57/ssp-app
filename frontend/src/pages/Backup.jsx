@@ -1,7 +1,17 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2, Database } from 'lucide-react';
+import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2, Database, HardDrive, PlugZap, Save, RefreshCw, RotateCcw } from 'lucide-react';
+import { formatDate } from '../utils.js';
+
+const SMB_DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+
+function formatDateTime(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (isNaN(d)) return v;
+  return d.toLocaleDateString('fr-FR') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
 
 export default function Backup() {
   const fileRef = useRef(null);
@@ -18,6 +28,19 @@ export default function Backup() {
   const sqlRef = useRef(null);
   const [confirmSql, setConfirmSql] = useState(null);
   const [importingSql, setImportingSql] = useState(false);
+
+  const [smbCfg, setSmbCfg] = useState({
+    host: '', share: '', username: '', domain: '', path: '', password: '',
+    passSet: false, enabled: false, day: 7, hour: 3, keep: 7
+  });
+  const [smbLast, setSmbLast] = useState({ at: '', status: '', message: '' });
+  const [smbFiles, setSmbFiles] = useState([]);
+  const [smbBusy, setSmbBusy] = useState('');
+  const [smbStatus, setSmbStatus] = useState('');
+  const [confirmSmbDelete, setConfirmSmbDelete] = useState(null);
+  const [confirmSmbRestore, setConfirmSmbRestore] = useState(null);
+  const [smbDeleting, setSmbDeleting] = useState(false);
+  const [smbRestoring, setSmbRestoring] = useState(false);
 
   function showToast(msg) {
     setToast(msg);
@@ -155,6 +178,116 @@ export default function Backup() {
     }
   }
 
+  async function loadSmbConfig() {
+    try {
+      const c = await api.get('/backup/smb/config');
+      setSmbCfg((prev) => ({
+        ...prev,
+        host: c.host || '',
+        share: c.share || '',
+        username: c.username || '',
+        domain: c.domain || '',
+        path: c.path || '',
+        passSet: !!c.passSet,
+        enabled: !!c.enabled,
+        day: c.day ?? 7,
+        hour: c.hour ?? 3,
+        keep: c.keep ?? 7
+      }));
+      setSmbLast({ at: c.lastBackupAt || '', status: c.lastStatus || '', message: c.lastMessage || '' });
+    } catch (e) {
+      /* config non lisible — ignorer */
+    }
+  }
+
+  async function loadSmbFiles() {
+    try {
+      const r = await api.get('/backup/smb/files');
+      setSmbFiles(r.files || []);
+    } catch (e) {
+      setSmbFiles([]);
+    }
+  }
+
+  useEffect(() => {
+    loadSmbConfig();
+    loadSmbFiles();
+  }, []);
+
+  async function handleSmbTest() {
+    setSmbBusy('test');
+    setSmbStatus('');
+    setError('');
+    try {
+      const r = await api.post('/backup/smb/test', smbCfg);
+      setSmbStatus(r.message);
+      showToast(r.message);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSmbBusy('');
+    }
+  }
+
+  async function handleSmbSave() {
+    setSmbBusy('save');
+    setError('');
+    try {
+      await api.post('/backup/smb/config', smbCfg);
+      showToast('Configuration SMB enregistrée');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSmbBusy('');
+    }
+  }
+
+  async function handleSmbBackupNow() {
+    setSmbBusy('now');
+    setError('');
+    try {
+      const r = await api.post('/backup/smb/backup-now');
+      showToast(r.message);
+      loadSmbFiles();
+      loadSmbConfig();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSmbBusy('');
+    }
+  }
+
+  async function handleSmbDelete() {
+    if (!confirmSmbDelete) return;
+    setSmbDeleting(true);
+    setError('');
+    try {
+      await api.post('/backup/smb/delete', { name: confirmSmbDelete.name });
+      showToast(`« ${confirmSmbDelete.name} » supprimé`);
+      loadSmbFiles();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSmbDeleting(false);
+      setConfirmSmbDelete(null);
+    }
+  }
+
+  async function handleSmbRestore() {
+    if (!confirmSmbRestore) return;
+    setSmbRestoring(true);
+    setError('');
+    try {
+      const r = await api.post('/backup/smb/restore', { name: confirmSmbRestore.name });
+      showToast(r.message);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSmbRestoring(false);
+      setConfirmSmbRestore(null);
+    }
+  }
+
   return (
     <div className="settings-page">
       <div className="page-header">
@@ -234,6 +367,122 @@ export default function Backup() {
         </div>
       </div>
 
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-title">
+          <HardDrive size={16} /> Sauvegarde automatique (SMB)
+        </div>
+        <p style={{ margin: '0 0 14px', color: 'var(--text-secondary)', fontSize: 13 }}>
+          Configurez l'accès à un partage réseau SMB (ex. NAS) pour y déposer automatiquement une
+          sauvegarde SQL de la base, selon un planning (jour de la semaine, heure) avec rotation
+          (nombre de sauvegardes à conserver).
+        </p>
+        <div className="form-row">
+          <div className="field">
+            <label>Serveur (hôte ou IP)</label>
+            <input type="text" value={smbCfg.host} onChange={(e) => setSmbCfg({ ...smbCfg, host: e.target.value })} placeholder="192.168.1.10" />
+          </div>
+          <div className="field">
+            <label>Partage</label>
+            <input type="text" value={smbCfg.share} onChange={(e) => setSmbCfg({ ...smbCfg, share: e.target.value })} placeholder="backup" />
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="field">
+            <label>Utilisateur</label>
+            <input type="text" value={smbCfg.username} onChange={(e) => setSmbCfg({ ...smbCfg, username: e.target.value })} autoComplete="off" />
+          </div>
+          <div className="field">
+            <label>Mot de passe</label>
+            <input type="password" value={smbCfg.password} onChange={(e) => setSmbCfg({ ...smbCfg, password: e.target.value })} placeholder={smbCfg.passSet ? '•••••• (laisser vide pour conserver)' : ''} autoComplete="new-password" />
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="field">
+            <label>Domaine (optionnel)</label>
+            <input type="text" value={smbCfg.domain} onChange={(e) => setSmbCfg({ ...smbCfg, domain: e.target.value })} />
+          </div>
+          <div className="field">
+            <label>Sous-dossier sur le partage (optionnel)</label>
+            <input type="text" value={smbCfg.path} onChange={(e) => setSmbCfg({ ...smbCfg, path: e.target.value })} placeholder="ssp-backups" />
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="field field-check">
+            <label className="check-label">
+              <input type="checkbox" checked={smbCfg.enabled} onChange={(e) => setSmbCfg({ ...smbCfg, enabled: e.target.checked })} />
+              Activer le backup automatique
+            </label>
+          </div>
+          <div className="field">
+            <label>Jour de la semaine</label>
+            <select value={smbCfg.day} onChange={(e) => setSmbCfg({ ...smbCfg, day: parseInt(e.target.value, 10) })}>
+              <option value={7}>Tous les jours</option>
+              {SMB_DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Heure</label>
+            <select value={smbCfg.hour} onChange={(e) => setSmbCfg({ ...smbCfg, hour: parseInt(e.target.value, 10) })}>
+              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h00</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Sauvegardes à garder</label>
+            <input type="number" min="1" max="100" value={smbCfg.keep} onChange={(e) => setSmbCfg({ ...smbCfg, keep: parseInt(e.target.value, 10) || 7 })} />
+          </div>
+        </div>
+        <div className="backup-actions">
+          <button className="btn btn-ghost" onClick={handleSmbTest} disabled={!!smbBusy}>
+            <PlugZap size={15} /> Tester la connexion
+          </button>
+          <button className="btn btn-ghost" onClick={handleSmbSave} disabled={!!smbBusy}>
+            <Save size={15} /> Enregistrer
+          </button>
+          <button className="btn btn-primary" onClick={handleSmbBackupNow} disabled={!!smbBusy}>
+            <Database size={15} /> Sauvegarder maintenant
+          </button>
+        </div>
+        {smbStatus && <div className="success-banner" style={{ marginTop: 12 }}>{smbStatus}</div>}
+        {smbLast.at && (
+          <p className="panel-sub">
+            Dernier backup : {formatDateTime(smbLast.at)} — {smbLast.status === 'ok' ? 'succès' : 'échec'}
+            {smbLast.message ? ` (${smbLast.message})` : ''}
+          </p>
+        )}
+
+        <div className="panel-title" style={{ marginTop: 20 }}>
+          <RefreshCw size={16} /> Fichiers sur le serveur SMB
+        </div>
+        <div className="backup-actions">
+          <button className="btn btn-ghost" onClick={loadSmbFiles}><RefreshCw size={15} /> Rafraîchir la liste</button>
+        </div>
+        {smbFiles.length === 0 ? (
+          <p className="panel-sub">Aucune sauvegarde trouvée sur le serveur SMB.</p>
+        ) : (
+          <table className="table table-compact" style={{ marginTop: 8 }}>
+            <thead><tr><th>Fichier</th><th>Date</th><th style={{ width: 150 }}></th></tr></thead>
+            <tbody>
+              {smbFiles.map((f) => (
+                <tr key={f.name}>
+                  <td>{f.name}</td>
+                  <td>{formatDate(f.mtime)}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-xs btn-ghost" onClick={() => setConfirmSmbRestore({ name: f.name })} title="Restaurer cette sauvegarde">
+                        <RotateCcw size={13} /> Restaurer
+                      </button>
+                      <button className="btn btn-xs btn-danger-ghost" onClick={() => setConfirmSmbDelete({ name: f.name })} title="Supprimer">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       <div className="panel">
         <div className="panel-title">
           <FileSpreadsheet size={16} /> Restaurer après incident
@@ -289,6 +538,28 @@ export default function Backup() {
           loading={importingSql}
           onCancel={() => setConfirmSql(null)}
           onConfirm={handleImportSql}
+        />
+      )}
+
+      {confirmSmbRestore && (
+        <ConfirmDialog
+          title="Restaurer depuis une sauvegarde SMB ?"
+          message={`La sauvegarde « ${confirmSmbRestore.name} » va remplacer l'intégralité de la base de données actuelle. Cette action est irréversible. Confirmez-vous la restauration ?`}
+          confirmLabel="Restaurer"
+          loading={smbRestoring}
+          onCancel={() => setConfirmSmbRestore(null)}
+          onConfirm={handleSmbRestore}
+        />
+      )}
+
+      {confirmSmbDelete && (
+        <ConfirmDialog
+          title="Supprimer une sauvegarde SMB ?"
+          message={`Le fichier « ${confirmSmbDelete.name} » sera définitivement supprimé du serveur SMB. Confirmez-vous ?`}
+          confirmLabel="Supprimer"
+          loading={smbDeleting}
+          onCancel={() => setConfirmSmbDelete(null)}
+          onConfirm={handleSmbDelete}
         />
       )}
     </div>

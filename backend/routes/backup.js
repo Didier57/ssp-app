@@ -5,6 +5,8 @@ const { requireAuth, requireAdmin } = require('../auth');
 const { buildBackupWorkbook, importBackup, buildFilesZip, importFilesZip, dumpSql, restoreFromSql, backupFilename, filesZipFilename, sqlFilename } = require('../backup');
 const { sendMail, smtpConfigured } = require('../mailer');
 const { logAudit } = require('../audit');
+const { getSetting, setSetting, getBool, getInt } = require('../settings');
+const smb = require('../smb');
 
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
@@ -128,6 +130,122 @@ router.post('/send', async (req, res) => {
     res.json({ ok: true, message: `Sauvegarde envoyée à ${to}` });
   } catch (e) {
     res.status(500).json({ error: `Envoi impossible : ${e.message}` });
+  }
+});
+
+// ===== Sauvegarde automatique SMB =====
+
+// GET /api/backup/smb/config — lit la configuration SMB (mot de passe masqué)
+router.get('/smb/config', (req, res) => {
+  const cfg = smb.getConfig();
+  res.json({
+    host: cfg.host,
+    share: cfg.share,
+    username: cfg.username,
+    domain: cfg.domain,
+    path: cfg.path,
+    passSet: !!cfg.password,
+    enabled: getBool('smb.enabled', false),
+    day: getInt('smb.day', 7),
+    hour: getInt('smb.hour', 3),
+    keep: getInt('smb.keep', 7),
+    lastBackupAt: getSetting('smb.last_backup_at', ''),
+    lastStatus: getSetting('smb.last_backup_status', ''),
+    lastMessage: getSetting('smb.last_backup_message', '')
+  });
+});
+
+// POST /api/backup/smb/config — enregistre la configuration SMB
+router.post('/smb/config', (req, res) => {
+  const b = req.body || {};
+  if (b.host !== undefined) setSetting('smb.host', b.host);
+  if (b.share !== undefined) setSetting('smb.share', b.share);
+  if (b.username !== undefined) setSetting('smb.username', b.username);
+  if (b.domain !== undefined) setSetting('smb.domain', b.domain);
+  if (b.path !== undefined) setSetting('smb.path', b.path);
+  if (b.password !== undefined && String(b.password) !== '') setSetting('smb.password', b.password);
+  if (b.enabled !== undefined) setSetting('smb.enabled', b.enabled ? '1' : '0');
+  if (b.day !== undefined) {
+    const d = parseInt(b.day, 10);
+    setSetting('smb.day', Number.isNaN(d) ? 7 : Math.max(0, Math.min(7, d)));
+  }
+  if (b.hour !== undefined) {
+    const h = parseInt(b.hour, 10);
+    setSetting('smb.hour', Number.isNaN(h) ? 3 : Math.max(0, Math.min(23, h)));
+  }
+  if (b.keep !== undefined) {
+    const k = parseInt(b.keep, 10);
+    setSetting('smb.keep', Number.isNaN(k) ? 7 : Math.max(1, Math.min(100, k)));
+  }
+  logAudit({ user: req.user, action: 'Configuration de la sauvegarde SMB', category: 'settings' });
+  res.json({ ok: true });
+});
+
+// POST /api/backup/smb/test — teste la connexion SMB (config fournie ou sauvegardée)
+router.post('/smb/test', async (req, res) => {
+  const b = req.body || {};
+  const saved = smb.getConfig();
+  const cfg = {
+    host: b.host !== undefined ? b.host : saved.host,
+    share: b.share !== undefined ? b.share : saved.share,
+    username: b.username !== undefined ? b.username : saved.username,
+    password: b.password !== undefined && b.password !== '' ? b.password : saved.password,
+    domain: b.domain !== undefined ? b.domain : saved.domain,
+    path: b.path !== undefined ? b.path : saved.path
+  };
+  try {
+    const r = await smb.testConnection(cfg);
+    logAudit({ user: req.user, action: 'Test de connexion SMB', category: 'settings', detail: 'succès' });
+    res.json({ ok: true, message: `Connexion réussie (${r.entries} élément(s) dans le répertoire)` });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: `Test échoué : ${e.message}` });
+  }
+});
+
+// GET /api/backup/smb/files — liste les sauvegardes sur le serveur SMB
+router.get('/smb/files', async (req, res) => {
+  try {
+    const files = await smb.listBackups();
+    res.json({ ok: true, files });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /api/backup/smb/backup-now — déclenche une sauvegarde SQL immédiate vers SMB
+router.post('/smb/backup-now', async (req, res) => {
+  try {
+    const r = await smb.backupNow();
+    logAudit({ user: req.user, action: 'Sauvegarde SMB manuelle', category: 'backup', target: r.filename });
+    res.json({ ok: true, message: `Sauvegarde « ${r.filename} » envoyée sur le serveur SMB`, ...r });
+  } catch (e) {
+    res.status(400).json({ error: `Sauvegarde impossible : ${e.message}` });
+  }
+});
+
+// POST /api/backup/smb/delete — supprime un fichier de sauvegarde SMB
+router.post('/smb/delete', async (req, res) => {
+  const name = req.body && req.body.name;
+  if (!name) return res.status(400).json({ error: 'Nom de fichier manquant' });
+  try {
+    const r = await smb.deleteBackup(name);
+    logAudit({ user: req.user, action: 'Suppression d\'une sauvegarde SMB', category: 'backup', target: name });
+    res.json({ ok: true, ...r });
+  } catch (e) {
+    res.status(400).json({ error: `Suppression impossible : ${e.message}` });
+  }
+});
+
+// POST /api/backup/smb/restore — restaure la base depuis une sauvegarde SMB
+router.post('/smb/restore', async (req, res) => {
+  const name = req.body && req.body.name;
+  if (!name) return res.status(400).json({ error: 'Nom de fichier manquant' });
+  try {
+    const result = await smb.restoreFromSmb(name);
+    logAudit({ user: req.user, action: 'Restauration depuis une sauvegarde SMB', category: 'backup', target: name });
+    res.json({ ok: true, message: `Base restaurée depuis « ${name} »`, ...result });
+  } catch (e) {
+    res.status(400).json({ error: `Restauration impossible : ${e.message}` });
   }
 });
 

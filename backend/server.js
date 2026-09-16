@@ -6,6 +6,7 @@ const config = require('./config');
 const { seed, ensureDefaultAdmin } = require('./seed');
 const { sendExpiryReminder, isTodayDone, markTodayDone } = require('./mailer');
 const { getBool, getInt } = require('./settings');
+const smb = require('./smb');
 
 seed();
 ensureDefaultAdmin();
@@ -63,3 +64,8 @@ setInterval(() => {
     console.error('[mailer] Échec rappel quotidien :', err.message)
   );
 }, 60 * 60 * 1000);
+
+// Job : sauvegarde automatique SQL vers SMB (vérifié chaque minute)
+setInterval(() => {
+  smb.maybeRunAutoBackup();
+}, 60 * 1000);
