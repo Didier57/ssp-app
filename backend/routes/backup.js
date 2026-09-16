@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../auth');
-const { buildBackupWorkbook, importBackup, buildFilesZip, importFilesZip, backupFilename, filesZipFilename } = require('../backup');
+const { buildBackupWorkbook, importBackup, buildFilesZip, importFilesZip, dumpSql, restoreFromSql, backupFilename, filesZipFilename, sqlFilename } = require('../backup');
 const { sendMail, smtpConfigured } = require('../mailer');
 const { logAudit } = require('../audit');
 
@@ -11,6 +11,7 @@ router.use(requireAuth, requireAdmin);
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 const zipUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
+const sqlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -61,6 +62,32 @@ router.post('/cleanup-files', (req, res) => {
     detail: `${result.changes} fichier(s) supprimé(s)`
   });
   res.json({ ok: true, deleted: result.changes });
+});
+
+// GET /api/backup/sql — télécharge le dump SQL complet de la base
+router.get('/sql', (req, res) => {
+  const sql = dumpSql();
+  logAudit({ user: req.user, action: 'Export de la base (SQL)', category: 'backup', target: sqlFilename() });
+  const buf = Buffer.from(sql, 'utf8');
+  res.setHeader('Content-Type', 'application/sql');
+  res.setHeader('Content-Disposition', `attachment; filename="${sqlFilename()}"`);
+  res.setHeader('Content-Length', buf.length);
+  res.send(buf);
+});
+
+// POST /api/backup/import-sql — restaure la base depuis un dump SQL
+router.post('/import-sql', sqlUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Fichier SQL manquant' });
+  }
+  try {
+    const sql = req.file.buffer.toString('utf8');
+    const result = restoreFromSql(sql);
+    logAudit({ user: req.user, action: 'Restauration de la base (SQL)', category: 'backup', target: req.file.originalname });
+    res.json({ ok: true, message: 'Base restaurée depuis le fichier SQL', ...result });
+  } catch (e) {
+    res.status(400).json({ error: `Import SQL impossible : ${e.message}` });
+  }
 });
 
 // POST /api/backup/import — restaure la base depuis un classeur sauvegardé

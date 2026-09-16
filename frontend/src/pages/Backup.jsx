@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2 } from 'lucide-react';
+import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2, Database } from 'lucide-react';
 
 export default function Backup() {
   const fileRef = useRef(null);
@@ -15,6 +15,9 @@ export default function Backup() {
   const [importingZip, setImportingZip] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState(false);
   const [purging, setPurging] = useState(false);
+  const sqlRef = useRef(null);
+  const [confirmSql, setConfirmSql] = useState(null);
+  const [importingSql, setImportingSql] = useState(false);
 
   function showToast(msg) {
     setToast(msg);
@@ -118,6 +121,40 @@ export default function Backup() {
     }
   }
 
+  async function handleExportSql() {
+    setBusy('sql');
+    setError('');
+    try {
+      await api.download('/backup/sql');
+      showToast('Export SQL de la base généré');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  function onSqlChosen(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) setConfirmSql(f);
+    e.target.value = '';
+  }
+
+  async function handleImportSql() {
+    if (!confirmSql) return;
+    setImportingSql(true);
+    setError('');
+    try {
+      const r = await api.upload('/backup/import-sql', confirmSql);
+      showToast(r.message);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setImportingSql(false);
+      setConfirmSql(null);
+    }
+  }
+
   return (
     <div className="settings-page">
       <div className="page-header">
@@ -178,6 +215,25 @@ export default function Backup() {
         </div>
       </div>
 
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <div className="panel-title">
+          <Database size={16} /> Sauvegarde SQL (base de données)
+        </div>
+        <p style={{ margin: '0 0 14px', color: 'var(--text-secondary)', fontSize: 13 }}>
+          Export complet de la base au format SQL : toutes les tables, y compris le contenu binaire
+          des fichiers de licence. Ce format permet une restauration complète et fidèle de la base.
+        </p>
+        <div className="backup-actions">
+          <button className="btn btn-primary" onClick={handleExportSql} disabled={!!busy}>
+            <Database size={16} />&nbsp;{busy === 'sql' ? <span className="spinner" /> : <Download size={15} />}&nbsp;<span>Exporter la base (SQL)</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => sqlRef.current.click()} disabled={!!busy}>
+            <Upload size={15} /> Importer un fichier SQL…
+          </button>
+          <input ref={sqlRef} type="file" accept=".sql,application/sql,text/plain" style={{ display: 'none' }} onChange={onSqlChosen} />
+        </div>
+      </div>
+
       <div className="panel">
         <div className="panel-title">
           <FileSpreadsheet size={16} /> Restaurer après incident
@@ -222,6 +278,17 @@ export default function Backup() {
           loading={purging}
           onCancel={() => setConfirmPurge(false)}
           onConfirm={handleCleanup}
+        />
+      )}
+
+      {confirmSql && (
+        <ConfirmDialog
+          title="Restaurer la base depuis un fichier SQL ?"
+          message={`Le fichier « ${confirmSql.name} » va remplacer l'intégralité de la base de données actuelle. Confirmez-vous la restauration ?`}
+          confirmLabel="Restaurer"
+          loading={importingSql}
+          onCancel={() => setConfirmSql(null)}
+          onConfirm={handleImportSql}
         />
       )}
     </div>

@@ -150,6 +150,86 @@ function backupFilename() {
   return `ssp_backup_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.xlsx`;
 }
 
+// ==== Sauvegarde / restauration SQL (base de données complète) ====
+
+function sqlFilename() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `ssp_database_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.sql`;
+}
+
+// Convertit une valeur JS (issue de better-sqlite3) en littéral SQL.
+function sqlValue(v) {
+  if (v === null || v === undefined) return 'NULL';
+  if (Buffer.isBuffer(v)) return `X'${v.toString('hex')}'`;
+  if (typeof v === 'bigint') return String(v);
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'NULL';
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+// Génère un dump SQL complet : toutes les tables (DROP + CREATE + INSERT),
+// puis les index et triggers. Les BLOB sont sérialisés en littéraux X'...'.
+function dumpSql() {
+  const tables = db
+    .prepare(`SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+    .all();
+  const parts = [];
+  for (const t of tables) {
+    parts.push(`DROP TABLE IF EXISTS "${t.name}";`);
+    if (t.sql) parts.push(`${t.sql};`);
+    const cols = db.prepare(`PRAGMA table_info("${t.name}")`).all().map((c) => c.name);
+    if (!cols.length) continue;
+    const rows = db.prepare(`SELECT * FROM "${t.name}"`).all();
+    for (const r of rows) {
+      const vals = cols.map((c) => sqlValue(r[c]));
+      parts.push(`INSERT INTO "${t.name}" (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${vals.join(', ')});`);
+    }
+  }
+  for (const i of db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%'`)
+    .all()) {
+    parts.push(`${i.sql};`);
+  }
+  for (const t of db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL`).all()) {
+    parts.push(`${t.sql};`);
+  }
+  return parts.join('\n');
+}
+
+// Reconstruit la base depuis un dump SQL. Remplace l'intégralité des tables
+// (transaction : rollback complet en cas d'erreur). Garde-fou admin conservé.
+function restoreFromSql(sqlString) {
+  const before = summary();
+  const originalAdmins = db
+    .prepare(`SELECT id, username, password_hash, role, email, created_at FROM users WHERE role = 'admin'`)
+    .all();
+
+  db.pragma('foreign_keys = OFF');
+  const tx = db.transaction(() => {
+    const tables = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+      .all();
+    for (const t of tables) {
+      db.prepare(`DROP TABLE IF EXISTS "${t.name}"`).run();
+    }
+    db.exec(sqlString);
+  });
+  tx();
+  db.pragma('foreign_keys = ON');
+
+  const adminsAfter = db.prepare(`SELECT id FROM users WHERE role = 'admin'`).all();
+  if (!adminsAfter.length && originalAdmins.length) {
+    const stmt = db.prepare(
+      `INSERT INTO users (id, username, password_hash, role, email, created_at) VALUES (?, ?, ?, 'admin', ?, ?)`
+    );
+    for (const a of originalAdmins) {
+      stmt.run(a.id, a.username, a.password_hash, a.email, a.created_at);
+    }
+  }
+
+  return { before, after: summary() };
+}
+
 // ==== Fichiers de licence (contenu binaire) ====
 
 // Normalise une MAC (même logique que routes/customers.js) en "00-1A-E8-C6-19-26"
@@ -284,7 +364,10 @@ module.exports = {
   importBackup,
   buildFilesZip,
   importFilesZip,
+  dumpSql,
+  restoreFromSql,
   backupFilename,
   filesZipFilename,
+  sqlFilename,
   summary
 };
