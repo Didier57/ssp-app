@@ -18,6 +18,7 @@ COPY --from=frontend /app/frontend/dist ./frontend/dist
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV TZ=Europe/Paris
+ENV NODE_OPTIONS=--openssl-legacy-provider
 EXPOSE 3001
 
 WORKDIR /app/backend

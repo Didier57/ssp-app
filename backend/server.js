@@ -8,6 +8,13 @@ const { sendExpiryReminder, isTodayDone, markTodayDone } = require('./mailer');
 const { getBool, getInt } = require('./settings');
 const smb = require('./smb');
 
+process.on('uncaughtException', (err) => {
+  console.error('[fatal] Erreur non interceptée :', err && err.message ? err.message : err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] Promesse rejetée non interceptée :', reason && reason.message ? reason.message : reason);
+});
+
 seed();
 ensureDefaultAdmin();
 
