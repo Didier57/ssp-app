@@ -216,13 +216,14 @@ export default function Backup() {
 
   async function handleSmbTest() {
     setSmbBusy('test');
-    setSmbStatus('');
+    setSmbStatus('Connexion au serveur SMB en cours…');
     setError('');
     try {
       const r = await api.post('/backup/smb/test', smbCfg);
       setSmbStatus(r.message);
       showToast(r.message);
     } catch (e) {
+      setSmbStatus('');
       setError(e.message);
     } finally {
       setSmbBusy('');
@@ -244,13 +245,16 @@ export default function Backup() {
 
   async function handleSmbBackupNow() {
     setSmbBusy('now');
+    setSmbStatus('Sauvegarde SQL en cours…');
     setError('');
     try {
       const r = await api.post('/backup/smb/backup-now');
+      setSmbStatus(r.message);
       showToast(r.message);
       loadSmbFiles();
       loadSmbConfig();
     } catch (e) {
+      setSmbStatus('');
       setError(e.message);
     } finally {
       setSmbBusy('');

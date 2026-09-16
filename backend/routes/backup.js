@@ -17,6 +17,8 @@ const sqlUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+const errMsg = (e) => (e && e.message ? e.message : String(e));
+
 // GET /api/backup/export — télécharge le classeur complet de sauvegarde
 router.get('/export', (req, res) => {
   const buf = buildBackupWorkbook();
@@ -198,7 +200,7 @@ router.post('/smb/test', async (req, res) => {
     logAudit({ user: req.user, action: 'Test de connexion SMB', category: 'settings', detail: 'succès' });
     res.json({ ok: true, message: `Connexion réussie (${r.entries} élément(s) dans le répertoire)` });
   } catch (e) {
-    res.status(400).json({ ok: false, error: `Test échoué : ${e.message}` });
+    res.status(400).json({ ok: false, error: `Test échoué : ${errMsg(e)}` });
   }
 });
 
@@ -208,7 +210,7 @@ router.get('/smb/files', async (req, res) => {
     const files = await smb.listBackups();
     res.json({ ok: true, files });
   } catch (e) {
-    res.status(400).json({ ok: false, error: e.message });
+    res.status(400).json({ ok: false, error: errMsg(e) });
   }
 });
 
@@ -219,7 +221,7 @@ router.post('/smb/backup-now', async (req, res) => {
     logAudit({ user: req.user, action: 'Sauvegarde SMB manuelle', category: 'backup', target: r.filename });
     res.json({ ok: true, message: `Sauvegarde « ${r.filename} » envoyée sur le serveur SMB`, ...r });
   } catch (e) {
-    res.status(400).json({ error: `Sauvegarde impossible : ${e.message}` });
+    res.status(400).json({ error: `Sauvegarde impossible : ${errMsg(e)}` });
   }
 });
 
@@ -232,7 +234,7 @@ router.post('/smb/delete', async (req, res) => {
     logAudit({ user: req.user, action: 'Suppression d\'une sauvegarde SMB', category: 'backup', target: name });
     res.json({ ok: true, ...r });
   } catch (e) {
-    res.status(400).json({ error: `Suppression impossible : ${e.message}` });
+    res.status(400).json({ error: `Suppression impossible : ${errMsg(e)}` });
   }
 });
 
@@ -245,7 +247,7 @@ router.post('/smb/restore', async (req, res) => {
     logAudit({ user: req.user, action: 'Restauration depuis une sauvegarde SMB', category: 'backup', target: name });
     res.json({ ok: true, message: `Base restaurée depuis « ${name} »`, ...result });
   } catch (e) {
-    res.status(400).json({ error: `Restauration impossible : ${e.message}` });
+    res.status(400).json({ error: `Restauration impossible : ${errMsg(e)}` });
   }
 });
 

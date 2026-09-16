@@ -39,19 +39,33 @@ function remotePath(cfg, name) {
 function createClient(cfg = getConfig()) {
   return new SMB2({
     share: unc(cfg),
-    domain: cfg.domain || undefined,
-    username: cfg.username,
-    password: cfg.password,
+    domain: cfg.domain || '',
+    username: cfg.username || '',
+    password: cfg.password || '',
     autoCloseTimeout: 0
   });
 }
 
 function safeDisconnect(client) {
   try {
-    if (client && typeof client.disconnect === 'function') client.disconnect();
+    if (!client) return;
+    if (typeof client.disconnect === 'function') client.disconnect();
+    if (client.socket && typeof client.socket.destroy === 'function') client.socket.destroy();
   } catch (e) {
     /* ignore */
   }
+}
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label || 'Délai d\'attente dépassé')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function smbCall(fn, ms, label) {
+  return withTimeout(fn(), ms, label || 'Le serveur SMB ne répond pas (délai dépassé)');
 }
 
 function safeName(name) {
@@ -75,10 +89,10 @@ async function testConnection(cfg = getConfig()) {
   try {
     const dir = remotePath(cfg, '');
     if (dir) {
-      const exists = await client.exists(dir);
+      const exists = await smbCall(() => client.exists(dir), 15000);
       if (!exists) throw new Error(`Le sous-dossier « ${dir} » n'existe pas sur le partage`);
     }
-    const entries = await client.readdir(dir || '', { stats: true });
+    const entries = await smbCall(() => client.readdir(dir || '', { stats: true }), 15000);
     return { ok: true, entries: entries.length };
   } finally {
     safeDisconnect(client);
@@ -90,7 +104,7 @@ async function listBackups(cfg = getConfig()) {
   const client = createClient(cfg);
   try {
     const dir = remotePath(cfg, '');
-    const entries = await client.readdir(dir || '', { stats: true });
+    const entries = await smbCall(() => client.readdir(dir || '', { stats: true }), 20000);
     const files = entries
       .filter((e) => e && typeof e.isDirectory === 'function' && !e.isDirectory())
       .filter((e) => e.name && e.name.startsWith(PREFIX) && e.name.endsWith('.sql'))
@@ -106,7 +120,7 @@ async function deleteBackup(name, cfg = getConfig()) {
   if (!isConfigured(cfg)) throw new Error('Configuration SMB incomplète');
   const client = createClient(cfg);
   try {
-    await client.unlink(remotePath(cfg, safeName(name)));
+    await smbCall(() => client.unlink(remotePath(cfg, safeName(name))), 30000);
     return { ok: true, name };
   } finally {
     safeDisconnect(client);
@@ -117,7 +131,7 @@ async function readBackup(name, cfg = getConfig()) {
   if (!isConfigured(cfg)) throw new Error('Configuration SMB incomplète');
   const client = createClient(cfg);
   try {
-    const data = await client.readFile(remotePath(cfg, safeName(name)));
+    const data = await smbCall(() => client.readFile(remotePath(cfg, safeName(name))), 60000);
     return Buffer.isBuffer(data) ? data : Buffer.from(String(data));
   } finally {
     safeDisconnect(client);
@@ -142,7 +156,7 @@ async function backupNow(cfg = getConfig()) {
     const sql = dumpSql();
     const client = createClient(cfg);
     try {
-      await client.writeFile(remotePath(cfg, filename), Buffer.from(sql, 'utf8'));
+      await smbCall(() => client.writeFile(remotePath(cfg, filename), Buffer.from(sql, 'utf8')), 120000);
     } finally {
       safeDisconnect(client);
     }
