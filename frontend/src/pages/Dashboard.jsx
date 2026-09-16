@@ -73,12 +73,12 @@ export default function Dashboard() {
           <div className="value green">{data.activeContracts}</div>
         </div>
         <div className="stat-card">
-          <div className="label">Expirations &lt; 90 jours</div>
-          <div className="value orange">{data.expiring90}</div>
+          <div className="label">Contrats annulés</div>
+          <div className="value red">{data.cancelledContracts}</div>
         </div>
         <div className="stat-card">
-          <div className="label">Licences expirées</div>
-          <div className="value red">{data.expired}</div>
+          <div className="label">Expirations &lt; 90 jours</div>
+          <div className="value orange">{data.expiring90}</div>
         </div>
       </div>
 

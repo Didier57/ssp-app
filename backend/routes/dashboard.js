@@ -15,6 +15,7 @@ function parseProduct(base) {
 router.get('/', (req, res) => {
   const total = db.prepare('SELECT COUNT(*) AS c FROM customers').get().c;
   const activeContracts = db.prepare('SELECT COUNT(*) AS c FROM customers WHERE contract = 1').get().c;
+  const cancelledContracts = db.prepare('SELECT COUNT(*) AS c FROM customers WHERE COALESCE(contract, 0) = 0').get().c;
 
   const now = new Date().toISOString().slice(0, 10);
   const expiring90 = db.prepare(
@@ -22,12 +23,6 @@ router.get('/', (req, res) => {
      WHERE date_end_licence IS NOT NULL AND date_end_licence != ''
        AND date(date_end_licence) BETWEEN date(?) AND date(?, '+90 days')`
   ).get(now, now).c;
-
-  const expired = db.prepare(
-    `SELECT COUNT(*) AS c FROM customers
-     WHERE date_end_licence IS NOT NULL AND date_end_licence != ''
-       AND date(date_end_licence) < date(?)`
-  ).get(now).c;
 
   // Ventilation par taille de produit (avec ou sans contrat)
   const products = db.prepare(
@@ -64,7 +59,7 @@ router.get('/', (req, res) => {
   res.json({
     total,
     activeContracts,
-    expired,
+    cancelledContracts,
     expiring90,
     bySize: toSeries(bySize),
     bySizeContract: toSeries(bySizeContract),
