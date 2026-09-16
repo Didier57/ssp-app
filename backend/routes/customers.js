@@ -30,7 +30,7 @@ router.use(requireAuth);
 // GET /api/customers - liste avec filtres
 router.get('/', (req, res) => {
   const { search, product, contract, expiring } = req.query;
-  let sql = `SELECT c.*, (SELECT COUNT(*) FROM customer_files f WHERE f.customer_id = c.id) AS file_count
+  let sql = `SELECT c.*, (SELECT COUNT(*) FROM customer_files f WHERE f.customer_id = c.id AND f.content IS NOT NULL AND length(f.content) > 0) AS file_count
              FROM customers c WHERE 1=1`;
   const params = [];
 
@@ -156,7 +156,9 @@ router.get('/:id/files', (req, res) => {
   if (!customer) return res.status(404).json({ error: 'Client introuvable' });
   const rows = db.prepare(
     `SELECT id, filename, mac_address, size, uploaded_at, uploaded_by
-     FROM customer_files WHERE customer_id = ? ORDER BY uploaded_at DESC, id DESC`
+     FROM customer_files
+     WHERE customer_id = ? AND content IS NOT NULL AND length(content) > 0
+     ORDER BY uploaded_at DESC, id DESC`
   ).all(customer.id);
   res.json(rows);
 });
@@ -202,9 +204,9 @@ router.post('/:id/files', upload.single('file'), (req, res) => {
 // GET /api/customers/:id/files/:fileId/download - téléchargement
 router.get('/:id/files/:fileId/download', (req, res) => {
   const row = db.prepare(
-    'SELECT filename, content FROM customer_files WHERE id = ? AND customer_id = ?'
+    'SELECT filename, content FROM customer_files WHERE id = ? AND customer_id = ? AND content IS NOT NULL AND length(content) > 0'
   ).get(req.params.fileId, req.params.id);
-  if (!row) return res.status(404).json({ error: 'Fichier introuvable' });
+  if (!row) return res.status(404).json({ error: 'Fichier introuvable ou vide (0 Ko)' });
   logAudit({ user: req.user, action: 'Téléchargement de fichier', category: 'file', target: row.filename });
   res.setHeader('Content-Disposition', `attachment; filename="${row.filename}"`);
   res.setHeader('Content-Type', 'application/octet-stream');

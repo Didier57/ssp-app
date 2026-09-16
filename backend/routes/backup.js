@@ -49,9 +49,22 @@ router.post('/import-files', zipUpload.single('file'), (req, res) => {
   }
 });
 
+// POST /api/backup/cleanup-files — purge les fichiers de licence vides (0 Ko)
+router.post('/cleanup-files', (req, res) => {
+  const result = db
+    .prepare(`DELETE FROM customer_files WHERE content IS NULL OR length(content) = 0`)
+    .run();
+  logAudit({
+    user: req.user,
+    action: 'Purge des fichiers de licence vides (0 Ko)',
+    category: 'file',
+    detail: `${result.changes} fichier(s) supprimé(s)`
+  });
+  res.json({ ok: true, deleted: result.changes });
+});
+
 // POST /api/backup/import — restaure la base depuis un classeur sauvegardé
-router.post('/import', upload.single('file'), (req, res) => {
-  if (!req.file) {
+router.post('/import', upload.single('file'), (req, res) => {  if (!req.file) {
     return res.status(400).json({ error: 'Fichier Excel manquant' });
   }
   try {

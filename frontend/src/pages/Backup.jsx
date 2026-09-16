@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive } from 'lucide-react';
+import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2 } from 'lucide-react';
 
 export default function Backup() {
   const fileRef = useRef(null);
@@ -13,6 +13,8 @@ export default function Backup() {
   const [importing, setImporting] = useState(false);
   const [confirmZip, setConfirmZip] = useState(null);
   const [importingZip, setImportingZip] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [purging, setPurging] = useState(false);
 
   function showToast(msg) {
     setToast(msg);
@@ -100,6 +102,22 @@ export default function Backup() {
     }
   }
 
+  async function handleCleanup() {
+    setPurging(true);
+    setError('');
+    try {
+      const r = await api.post('/backup/cleanup-files');
+      showToast(r.deleted > 0
+        ? `${r.deleted} fichier(s) vide(s) supprimé(s)`
+        : 'Aucun fichier vide à supprimer');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setPurging(false);
+      setConfirmPurge(false);
+    }
+  }
+
   return (
     <div className="settings-page">
       <div className="page-header">
@@ -154,6 +172,9 @@ export default function Backup() {
             <Upload size={15} /> Importer un fichier ZIP…
           </button>
           <input ref={zipRef} type="file" accept=".zip,application/zip" style={{ display: 'none' }} onChange={onZipChosen} />
+          <button className="btn btn-danger-ghost" onClick={() => setConfirmPurge(true)} disabled={!!busy || purging}>
+            <Trash2 size={15} /> Purger les fichiers vides (0 Ko)
+          </button>
         </div>
       </div>
 
@@ -190,6 +211,17 @@ export default function Backup() {
           loading={importingZip}
           onCancel={() => setConfirmZip(null)}
           onConfirm={handleImportZip}
+        />
+      )}
+
+      {confirmPurge && (
+        <ConfirmDialog
+          title="Purger les fichiers de licence vides (0 Ko) ?"
+          message="Tous les fichiers de licence dont le contenu est vide (0 Ko) seront supprimés de la base. Ils ne seront plus affichés ni téléchargeables. Confirmez-vous ?"
+          confirmLabel="Purger"
+          loading={purging}
+          onCancel={() => setConfirmPurge(false)}
+          onConfirm={handleCleanup}
         />
       )}
     </div>
