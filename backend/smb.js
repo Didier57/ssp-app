@@ -1,6 +1,7 @@
 const SMB2 = require('@marsaud/smb2');
 const { getSetting, setSetting, getBool, getInt } = require('./settings');
 const { dumpSql, restoreFromSql } = require('./backup');
+const { logAudit } = require('./audit');
 
 const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const PREFIX = 'ssp_database_';
@@ -204,9 +205,26 @@ function shouldRunNow() {
 async function maybeRunAutoBackup() {
   if (!shouldRunNow()) return null;
   try {
-    return await backupNow();
+    const r = await backupNow();
+    logAudit({
+      username: 'Système',
+      action: 'Sauvegarde automatique de la base (SMB)',
+      category: 'backup',
+      target: r.filename,
+      detail: r.deleted && r.deleted.length
+        ? `${r.deleted.length} ancienne(s) sauvegarde(s) supprimée(s)`
+        : null
+    });
+    return r;
   } catch (err) {
     console.error('[smb] Échec backup automatique :', err.message);
+    logAudit({
+      username: 'Système',
+      action: 'Échec de la sauvegarde automatique (SMB)',
+      category: 'backup',
+      target: 'auto',
+      detail: err.message
+    });
     return null;
   }
 }
