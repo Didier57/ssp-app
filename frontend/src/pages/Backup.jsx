@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { DatabaseBackup, Download, Mail, Upload, FileSpreadsheet, ShieldAlert, FileArchive, Trash2, Database, HardDrive, PlugZap, Save, RefreshCw, RotateCcw } from 'lucide-react';
-import { formatDate } from '../utils.js';
 
 const SMB_DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 
@@ -464,12 +463,12 @@ export default function Backup() {
           <p className="panel-sub">Aucune sauvegarde trouvée sur le serveur SMB.</p>
         ) : (
           <table className="table table-compact" style={{ marginTop: 8 }}>
-            <thead><tr><th>Fichier</th><th>Date</th><th style={{ width: 150 }}></th></tr></thead>
+            <thead><tr><th>Fichier</th><th>Date et heure</th><th style={{ width: 150 }}></th></tr></thead>
             <tbody>
               {smbFiles.map((f) => (
                 <tr key={f.name}>
                   <td>{f.name}</td>
-                  <td>{formatDate(f.mtime)}</td>
+                  <td>{formatDateTime(f.mtime)}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-xs btn-ghost" onClick={() => setConfirmSmbRestore({ name: f.name })} title="Restaurer cette sauvegarde">
