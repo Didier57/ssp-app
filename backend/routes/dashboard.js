@@ -21,6 +21,7 @@ router.get('/', (req, res) => {
   const expiring90 = db.prepare(
     `SELECT COUNT(*) AS c FROM customers
      WHERE date_end_licence IS NOT NULL AND date_end_licence != ''
+       AND contract = 1
        AND date(date_end_licence) BETWEEN date(?) AND date(?, '+90 days')`
   ).get(now, now).c;
 
@@ -75,6 +76,7 @@ router.get('/expiring', (req, res) => {
   const rows = db.prepare(
     `SELECT * FROM customers
      WHERE date_end_licence IS NOT NULL AND date_end_licence != ''
+       AND contract = 1
        AND date(date_end_licence) BETWEEN date(?) AND date(?)
      ORDER BY date_end_licence ASC`
   ).all(now, target);
