@@ -1223,6 +1223,9 @@ table.table tr.cell-muted td b { color: var(--muted); font-weight: 600; }
 [data-theme="dark"] .badge-gray { background: #1e293b; color: #94a3b8; }
 [data-theme="dark"] .badge-blue { background: #1e3a8a; color: #93c5fd; }
 
+/* Étiquettes du graphique « Expirations à venir » : illisibles en bleu sur fond sombre */
+[data-theme="dark"] .recharts-label-list text { fill: #ffffff; }
+
 @media (max-width: 1100px) {
   table.table { min-width: 100%; }
 }
