@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList,
   PieChart, Pie, Cell, CartesianGrid, Legend
 } from 'recharts';
 import { api } from '../api.js';
@@ -127,12 +127,14 @@ export default function Dashboard() {
         <div className="panel">
           <h3>Expirations à venir (6 mois)</h3>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.expirations}>
+            <BarChart data={data.expirations} margin={{ top: 20 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="mois" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="n" name="Clients" fill="#1d4ed8" />
+              <Bar dataKey="n" name="Clients" fill="#1d4ed8">
+                <LabelList dataKey="n" position="top" fontSize={13} fontWeight={700} fill="#1d4ed8" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
