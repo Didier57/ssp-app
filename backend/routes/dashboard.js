@@ -53,6 +53,7 @@ router.get('/', (req, res) => {
     `SELECT strftime('%Y-%m', date_end_licence) AS mois, COUNT(*) AS n
      FROM customers
      WHERE date_end_licence IS NOT NULL AND date_end_licence != ''
+       AND contract = 1
        AND date(date_end_licence) BETWEEN date(?) AND date(?, '+6 months')
      GROUP BY mois ORDER BY mois`
   ).all(now, now);
