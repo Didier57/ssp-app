@@ -10,6 +10,7 @@ import TCD from './pages/TCD.jsx';
 import FreeLicences from './pages/FreeLicences.jsx';
 import Users from './pages/Users.jsx';
 import Settings from './pages/Settings.jsx';
+import Logs from './pages/Logs.jsx';
 import Backup from './pages/Backup.jsx';
 import Layout from './components/Layout.jsx';
 
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/freelicenses" element={<FreeLicences />} />
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
           <Route path="/settings" element={<RequireAdmin><Settings /></RequireAdmin>} />
+          <Route path="/logs" element={<RequireAdmin><Logs /></RequireAdmin>} />
           <Route path="/backup" element={<RequireAdmin><Backup /></RequireAdmin>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

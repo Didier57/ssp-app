@@ -19,14 +19,21 @@ router.get('/meta', requireAdmin, (req, res) => {
   res.json({ users, categories });
 });
 
-// Journal d'activité (admin) : ?limit=, ?user=, ?category=
+// Journal d'activité (admin) : ?limit=, ?user=, ?category=, ?from=, ?to=, ?search=
 router.get('/', requireAdmin, (req, res) => {
-  const { limit, user, category } = req.query;
-  const lim = Math.min(1000, Math.max(1, parseInt(limit, 10) || 200));
+  const { limit, user, category, from, to, search } = req.query;
+  const lim = Math.min(2000, Math.max(1, parseInt(limit, 10) || 200));
   const where = [];
   const params = [];
   if (user) { where.push('username = ?'); params.push(String(user)); }
   if (category) { where.push('category = ?'); params.push(String(category)); }
+  if (from) { where.push('date(created_at) >= date(?)'); params.push(String(from)); }
+  if (to) { where.push('date(created_at) <= date(?)'); params.push(String(to)); }
+  if (search) {
+    where.push('(action LIKE ? OR target LIKE ? OR detail LIKE ? OR username LIKE ?)');
+    const like = `%${String(search)}%`;
+    params.push(like, like, like, like);
+  }
 
   const sql = `
     SELECT id, created_at, username, category, action, target, detail

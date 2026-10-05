@@ -1,21 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { Plus, Pencil, Trash2, X, Activity, UserX, UserCheck, Send, ShieldOff, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, UserX, UserCheck, Send, ShieldOff, RotateCcw } from 'lucide-react';
 
 const EMPTY = { username: '', email: '', password: '', role: 'lecteur' };
-
-const CAT_NAMES = {
-  login: 'Connexions',
-  user: 'Utilisateurs',
-  profile: 'Profils',
-  customer: 'Clients',
-  file: 'Fichiers',
-  license: 'Licences',
-  settings: 'Paramètres',
-  backup: 'Sauvegarde',
-  general: 'Divers'
-};
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -32,15 +20,6 @@ export default function Users() {
   const [confirm2fa, setConfirm2fa] = useState(null); // { user, action: 'reset' | 'disable' }
   const [toast, setToast] = useState('');
   const [tempPass, setTempPass] = useState(null); // mot de passe provisoire si l'email n'a pas pu partir
-
-  // Journal d'activité
-  const [logs, setLogs] = useState([]);
-  const [logsLoading, setLogsLoading] = useState(true);
-  const [logError, setLogError] = useState('');
-  const [metaUsers, setMetaUsers] = useState([]);
-  const [metaCategories, setMetaCategories] = useState([]);
-  const [userFilter, setUserFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
 
   function showToast(msg) {
     setToast(msg);
@@ -63,26 +42,7 @@ export default function Users() {
   useEffect(() => {
     load();
     api.get('/auth/me').then(setMe).catch(() => {});
-    api.get('/activity/meta').then((meta) => {
-      setMetaUsers(meta.users || []);
-      setMetaCategories(meta.categories || []);
-    }).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLogsLoading(true);
-    setLogError('');
-    const params = new URLSearchParams();
-    params.set('limit', '200');
-    if (userFilter) params.set('user', userFilter);
-    if (categoryFilter) params.set('category', categoryFilter);
-    api.get(`/activity?${params.toString()}`)
-      .then((data) => { if (!cancelled) setLogs(data || []); })
-      .catch((e) => { if (!cancelled) setLogError(e.message); })
-      .finally(() => { if (!cancelled) setLogsLoading(false); });
-    return () => { cancelled = true; };
-  }, [userFilter, categoryFilter]);
 
   function openCreate() {
     setForm(EMPTY);
@@ -412,58 +372,6 @@ export default function Users() {
           confirmLabel={confirm2fa.action === 'reset' ? 'Réinitialiser' : 'Désactiver'}
         />
       )}
-
-      <section className="panel" style={{ marginTop: 24 }}>
-        <div className="panel-title">
-          <Activity size={16} /> Journal d'activité
-          <span className="field-hint">connexions, modifications, suppressions, imports… (200 dernières entrées)</span>
-        </div>
-        <div className="toolbar">
-          <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
-            <option value="">Tous les utilisateurs</option>
-            {metaUsers.map((u) => <option key={u} value={u}>{u}</option>)}
-          </select>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-            <option value="">Toutes les catégories</option>
-            {metaCategories.map((c) => <option key={c} value={c}>{CAT_NAMES[c] || c}</option>)}
-          </select>
-        </div>
-        <div className="table-wrap">
-          {logsLoading ? (
-            <div className="empty-state"><span className="spinner" /></div>
-          ) : logError ? (
-            <div className="error-banner">{logError}</div>
-          ) : logs.length === 0 ? (
-            <div className="empty-state">Aucune activité enregistrée.</div>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: 150 }}>Date</th>
-                  <th style={{ width: 130 }}>Utilisateur</th>
-                  <th style={{ width: 110 }}>Catégorie</th>
-                  <th style={{ width: 220 }}>Action</th>
-                  <th>Cible / détail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((l) => (
-                  <tr key={l.id} className={l.category === 'login' && l.action.startsWith('Échec') ? 'cell-red' : ''}>
-                    <td className="nowrap">{l.created_at ? l.created_at.slice(0, 16) : '—'}</td>
-                    <td>{l.username || '—'}</td>
-                    <td><span className="badge badge-gray">{CAT_NAMES[l.category] || l.category}</span></td>
-                    <td className="nowrap">{l.action}</td>
-                    <td>
-                      {l.target ? <b>{l.target}</b> : null}
-                      {l.detail ? <span className="field-hint"> — {l.detail}</span> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </section>
 
       {toast && <div className="toast">{toast}</div>}
     </div>

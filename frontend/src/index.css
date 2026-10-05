@@ -272,6 +272,9 @@ body {
 
 .page-header h2 {
   font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .page-header .sub {
@@ -541,6 +544,25 @@ body {
 }
 
 .toolbar-date-sep { color: var(--muted); font-size: 12px; }
+
+/* Page Logs */
+.log-autorefresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.log-count {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+}
 
 .table-wrap {
   background: var(--surface);

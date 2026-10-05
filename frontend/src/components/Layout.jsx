@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, FileBarChart2, Table, UserCog, Settings, UserCircle, LogOut, DatabaseBackup, Moon, Sun, BadgeCheck } from 'lucide-react';
+import { LayoutDashboard, Users, FileBarChart2, Table, UserCog, Settings, ScrollText, UserCircle, LogOut, DatabaseBackup, Moon, Sun, BadgeCheck } from 'lucide-react';
 import { useAuth } from '../App.jsx';
 import ProfileModal from './ProfileModal.jsx';
 
@@ -54,6 +54,11 @@ export default function Layout() {
           {isAdmin && (
             <NavLink to="/settings">
               <Settings size={16} /> Paramètres
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink to="/logs">
+              <ScrollText size={16} /> Logs
             </NavLink>
           )}
           {isAdmin && (
