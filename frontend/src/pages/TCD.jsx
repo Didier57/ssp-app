@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '../api.js';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -11,6 +12,7 @@ export default function TCD() {
   const [years, setYears] = useState([]);
   const [rows, setRows] = useState([]);
   const [year, setYear] = useState('');
+  const [collapsed, setCollapsed] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -20,11 +22,9 @@ export default function TCD() {
       try {
         const data = await api.get('/tcd');
         if (cancelled) return;
-        const ys = [...(data.years || [])].sort((a, b) => String(b).localeCompare(String(a)));
+        const ys = [...(data.years || [])].sort((a, b) => String(a).localeCompare(String(b)));
         setYears(ys);
         setRows(data.rows || []);
-        const current = String(new Date().getFullYear());
-        setYear(ys.includes(current) ? current : (ys[0] || ''));
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -33,30 +33,41 @@ export default function TCD() {
     }
     load();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!year) return;
-      setLoading(true);
-      setError('');
-      try {
-        const data = await api.get(`/tcd?year=${encodeURIComponent(year)}`);
-        if (!cancelled) setRows(data.rows || []);
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [year]);
+  const filtered = useMemo(
+    () => (year ? rows.filter((r) => String(r.annee) === year) : rows),
+    [rows, year]
+  );
 
-  const totalUsers = rows.reduce((a, r) => a + (Number(r.users) || 0), 0);
-  const totalClients = rows.reduce((a, r) => a + (Number(r.clients) || 0), 0);
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const r of filtered) {
+      const y = String(r.annee);
+      if (!map.has(y)) map.set(y, []);
+      map.get(y).push(r);
+    }
+    return [...map.entries()]
+      .map(([annee, months]) => ({
+        annee,
+        months: [...months].sort((a, b) => a.mois - b.mois),
+        users: months.reduce((s, m) => s + (Number(m.users) || 0), 0),
+        clients: months.reduce((s, m) => s + (Number(m.clients) || 0), 0),
+      }))
+      .sort((a, b) => a.annee.localeCompare(b.annee));
+  }, [filtered]);
+
+  const totalUsers = groups.reduce((a, g) => a + g.users, 0);
+  const totalClients = groups.reduce((a, g) => a + g.clients, 0);
+
+  function toggle(annee) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(annee)) next.delete(annee);
+      else next.add(annee);
+      return next;
+    });
+  }
 
   function openMonth(r) {
     const mm = String(r.mois).padStart(2, '0');
@@ -77,49 +88,63 @@ export default function TCD() {
       {error && <div className="error-banner">{error}</div>}
 
       <div className="toolbar">
-        <select value={year} onChange={(e) => setYear(e.target.value)}>
-          {!years.includes(year) && <option value="">Toutes les années</option>}
+        <select value={year} onChange={(e) => { setYear(e.target.value); setCollapsed(new Set()); }}>
+          <option value="">Toutes les années</option>
           {years.map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
-        {!loading && rows.length > 0 && (
+        {groups.length > 0 && (
           <span>
-            {year ? `${rows.length} mois — ` : ''}{totalClients} client(s) — {totalUsers.toLocaleString('fr-FR')} utilisateur(s) à activer
+            {totalClients.toLocaleString('fr-FR')} client(s) — {totalUsers.toLocaleString('fr-FR')} utilisateur(s) à activer
           </span>
         )}
       </div>
 
-      {rows.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="empty-state">Aucune licence à activer pour cette sélection.</div>
       ) : (
         <div className="report-wrap">
-          <table className="table table-compact">
+          <table className="table table-compact tcd">
             <thead>
               <tr>
-                <th>Année</th>
-                <th>Mois</th>
-                <th>Utilisateurs</th>
+                <th>Année / Mois</th>
+                <th className="tcd-num">Nombre d'utilisateurs</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={`${r.annee}-${r.mois}`}
-                  className="row-clickable"
-                  title="Afficher les clients de ce mois"
-                  onClick={() => openMonth(r)}
-                >
-                  <td>{r.annee}</td>
-                  <td>{MOIS[r.mois - 1] || r.mois}</td>
-                  <td>{Number(r.users).toLocaleString('fr-FR')}</td>
-                </tr>
-              ))}
+              {groups.map((g) => {
+                const isCollapsed = collapsed.has(g.annee);
+                return (
+                  <React.Fragment key={g.annee}>
+                    <tr className="tcd-year" onClick={() => toggle(g.annee)} title="Afficher / masquer les mois">
+                      <td>
+                        <span className="tcd-toggle">
+                          {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                        </span>
+                        {g.annee}
+                      </td>
+                      <td className="tcd-num">{g.users.toLocaleString('fr-FR')}</td>
+                    </tr>
+                    {!isCollapsed && g.months.map((m) => (
+                      <tr
+                        key={`${m.annee}-${m.mois}`}
+                        className="row-clickable"
+                        title="Afficher les clients de ce mois"
+                        onClick={() => openMonth(m)}
+                      >
+                        <td className="tcd-month">{MOIS[m.mois - 1] || m.mois}</td>
+                        <td className="tcd-num">{Number(m.users).toLocaleString('fr-FR')}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="report-sum-row">
-                <td colSpan="2">Total</td>
-                <td>{totalUsers.toLocaleString('fr-FR')}</td>
+                <td>Total</td>
+                <td className="tcd-num">{totalUsers.toLocaleString('fr-FR')}</td>
               </tr>
             </tfoot>
           </table>
