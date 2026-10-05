@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList,
   PieChart, Pie, Cell, CartesianGrid, Legend
@@ -35,6 +35,7 @@ function PieLabel(props) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [expiring, setExpiring] = useState([]);
   const [error, setError] = useState('');
@@ -48,6 +49,11 @@ export default function Dashboard() {
   if (!data) return <div className="empty-state"><span className="spinner" /></div>;
 
   const soon = expiring.slice(0, 10);
+
+  function openMonth(entry) {
+    const mois = entry && entry.payload ? entry.payload.mois : entry && entry.mois;
+    if (mois) navigate(`/clients?exp=${encodeURIComponent(mois)}`);
+  }
 
   const sumSeries = (arr) => (arr || []).reduce((a, d) => a + (Number(d.value) || 0), 0);
   const totalAll = sumSeries(data.bySize);
@@ -132,7 +138,7 @@ export default function Dashboard() {
               <XAxis dataKey="mois" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="n" name="Clients" fill="#1d4ed8">
+              <Bar dataKey="n" name="Clients" fill="#1d4ed8" onClick={openMonth}>
                 <LabelList dataKey="n" position="top" fontSize={13} fontWeight={700} fill="#1d4ed8" />
               </Bar>
             </BarChart>

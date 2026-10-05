@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../App.jsx';
 import { formatDate, daysUntil } from '../utils.js';
@@ -76,6 +77,10 @@ export default function Clients() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  // Mois d'expiration transmis depuis le Dashboard (/clients?exp=YYYY-MM)
+  const [searchParams] = useSearchParams();
+  const expMonth = searchParams.get('exp') || '';
+
   const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -83,7 +88,9 @@ export default function Clients() {
   const [search, setSearch] = useState('');
   const [colFilters, setColFilters] = useState({ contract: ['1'] }); // Par défaut : clients avec contrat
   const [filterOpen, setFilterOpen] = useState(null); // clé de colonne ouverte ou null
-  const [dateRanges, setDateRanges] = useState({}); // { [colKey]: { from, to } } pour les colonnes de date
+  const [dateRanges, setDateRanges] = useState(() =>
+    expMonth ? { date_end_licence: { from: `${expMonth}-01`, to: `${expMonth}-31` } } : {}
+  ); // { [colKey]: { from, to } } pour les colonnes de date
 
   const [sortKey, setSortKey] = useState('date_end_licence');
   const [sortDir, setSortDir] = useState('asc'); // dates les plus proches en haut
@@ -183,6 +190,14 @@ export default function Clients() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Filtre sur le mois d'expiration reçu depuis le Dashboard
+  useEffect(() => {
+    if (!expMonth) return;
+    setDateRanges((d) => ({ ...d, date_end_licence: { from: `${expMonth}-01`, to: `${expMonth}-31` } }));
+    setSortKey('date_end_licence');
+    setSortDir('asc');
+  }, [expMonth]);
 
   // Applique recherche + filtres colonne (sauf columnSkip)
   function applyFilters(rows, colFiltersToApply, skipKey) {
