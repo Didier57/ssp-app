@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 
 export default function TCD() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [years, setYears] = useState([]);
@@ -56,6 +58,11 @@ export default function TCD() {
   const totalUsers = rows.reduce((a, r) => a + (Number(r.users) || 0), 0);
   const totalClients = rows.reduce((a, r) => a + (Number(r.clients) || 0), 0);
 
+  function openMonth(r) {
+    const mm = String(r.mois).padStart(2, '0');
+    navigate(`/clients?exp=${encodeURIComponent(`${r.annee}-${mm}`)}`);
+  }
+
   if (loading) return <div className="empty-state"><span className="spinner" /></div>;
 
   return (
@@ -63,7 +70,7 @@ export default function TCD() {
       <div className="page-header">
         <div>
           <h2>TCD — Renouvellements sous contrat</h2>
-          <div className="sub">Clients avec contrat — nombre d'utilisateurs à activer par date (fin de licence)</div>
+          <div className="sub">Clients avec contrat — nombre d'utilisateurs à activer par mois (fin de licence)</div>
         </div>
       </div>
 
@@ -78,7 +85,7 @@ export default function TCD() {
         </select>
         {!loading && rows.length > 0 && (
           <span>
-            {year ? `${rows.length} date(s) — ` : ''}{totalClients} client(s) — {totalUsers.toLocaleString('fr-FR')} utilisateur(s) à activer
+            {year ? `${rows.length} mois — ` : ''}{totalClients} client(s) — {totalUsers.toLocaleString('fr-FR')} utilisateur(s) à activer
           </span>
         )}
       </div>
@@ -92,23 +99,26 @@ export default function TCD() {
               <tr>
                 <th>Année</th>
                 <th>Mois</th>
-                <th>Jour</th>
                 <th>Utilisateurs</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={`${r.annee}-${r.mois}-${r.jour}`}>
+                <tr
+                  key={`${r.annee}-${r.mois}`}
+                  className="row-clickable"
+                  title="Afficher les clients de ce mois"
+                  onClick={() => openMonth(r)}
+                >
                   <td>{r.annee}</td>
                   <td>{MOIS[r.mois - 1] || r.mois}</td>
-                  <td>{r.jour}</td>
                   <td>{Number(r.users).toLocaleString('fr-FR')}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr className="report-sum-row">
-                <td colSpan="3">Total</td>
+                <td colSpan="2">Total</td>
                 <td>{totalUsers.toLocaleString('fr-FR')}</td>
               </tr>
             </tfoot>

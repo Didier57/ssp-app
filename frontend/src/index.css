@@ -1251,6 +1251,9 @@ table.table tr.cell-muted td b { color: var(--muted); font-weight: 600; }
 /* Barres du graphique « Expirations à venir » : cliquables */
 .recharts-bar-rectangle { cursor: pointer; }
 
+/* Lignes de tableau cliquables (ex. TCD : ouvre les clients du mois) */
+table.table tr.row-clickable { cursor: pointer; }
+
 @media (max-width: 1100px) {
   table.table { min-width: 100%; }
 }
